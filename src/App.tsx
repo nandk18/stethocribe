@@ -8,6 +8,9 @@ import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import ReceptionistDashboard from "./pages/ReceptionistDashboard";
 import DoctorDashboard from "./pages/DoctorDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
+import PatientsPage from "./pages/PatientsPage";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -72,11 +75,13 @@ function AppRoutes() {
 
   // Role-based dashboard
   const role = profile?.role;
-  const DashboardComponent = role === "receptionist" ? ReceptionistDashboard : DoctorDashboard;
+  const DashboardComponent = role === "receptionist" ? ReceptionistDashboard : role === "doctor" ? DoctorDashboard : AdminDashboard;
 
   return (
     <Routes>
-      <Route path="/dashboard/*" element={<DashboardComponent />} />
+      <Route path="/dashboard" element={<DashboardComponent />} />
+      <Route path="/dashboard/patients" element={<PatientsPage />} />
+      <Route path="/dashboard/settings" element={<Settings />} />
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/auth" element={<Navigate to="/dashboard" replace />} />
       <Route path="/onboarding" element={<Navigate to="/dashboard" replace />} />
