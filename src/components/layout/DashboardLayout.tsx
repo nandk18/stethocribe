@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useClinic } from "@/hooks/useClinic";
 import { NavLink } from "@/components/NavLink";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ const adminLinks = [
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { profile, signOut, user } = useAuth();
+  const { clinic } = useClinic();
   const navigate = useNavigate();
   const role = profile?.role ?? "admin";
 
@@ -46,7 +48,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary/20">
             <Stethoscope className="h-5 w-5 text-sidebar-primary" />
           </div>
-          <span className="font-display text-lg font-bold text-sidebar-foreground">MediScribe</span>
+          <span className="font-display text-lg font-bold text-sidebar-foreground">{clinic?.name || "MediScribe"}</span>
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-4">

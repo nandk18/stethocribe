@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Search, UserPlus } from "lucide-react";
 
-export default function PatientRegistration() {
+export default function PatientRegistration({ onSuccess }: { onSuccess?: () => void } = {}) {
   const { profile, user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -81,6 +81,7 @@ export default function PatientRegistration() {
       if (error) throw error;
       toast.success(`Token #${tokenNumber} issued`);
       resetForm();
+      onSuccess?.();
     } catch (err: any) {
       toast.error(err.message);
     }
