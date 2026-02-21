@@ -37,18 +37,12 @@ export default function Onboarding() {
     if (!clinicName.trim()) { toast.error("Clinic name is required"); return; }
     setLoading(true);
     try {
-      const { data: clinic, error: clinicError } = await supabase
-        .from("clinics")
-        .insert({ name: clinicName, address: clinicAddress, phone: clinicPhone })
-        .select()
-        .single();
-      if (clinicError) throw clinicError;
-
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({ clinic_id: clinic.id })
-        .eq("user_id", user!.id);
-      if (profileError) throw profileError;
+      const { data: clinicId, error } = await supabase.rpc('complete_clinic_onboarding', {
+        p_clinic_name: clinicName,
+        p_clinic_address: clinicAddress || null,
+        p_clinic_phone: clinicPhone || null,
+      });
+      if (error) throw error;
 
       toast.success("Clinic created!");
       setStep(1);
