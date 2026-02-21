@@ -397,6 +397,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      complete_clinic_onboarding: {
+        Args: {
+          p_clinic_address?: string
+          p_clinic_name: string
+          p_clinic_phone?: string
+        }
+        Returns: string
+      }
       get_user_clinic_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
