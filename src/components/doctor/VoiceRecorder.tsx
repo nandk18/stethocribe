@@ -82,8 +82,15 @@ export default function VoiceRecorder({ visitId, onTranscriptProcessed }: Props)
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
+    console.log('stopRecording called', mediaRecorderRef.current?.state);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (mediaRecorderRef.current) {
+      if (mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
       setIsRecording(false);
     }
   };
@@ -128,18 +135,30 @@ export default function VoiceRecorder({ visitId, onTranscriptProcessed }: Props)
         {!manualMode ? (
           <div className="flex flex-col items-center gap-6 py-8">
             <div className="relative">
-              <button
-                onClick={isRecording ? stopRecording : startRecording}
-                className={`flex h-24 w-24 items-center justify-center rounded-full transition-all ${
-                  isRecording
-                    ? "bg-destructive text-destructive-foreground shadow-lg"
-                    : "bg-primary text-primary-foreground shadow-elevated hover:scale-105"
-                }`}
-              >
-                {isRecording ? <Square className="h-8 w-8" /> : <Mic className="h-10 w-10" />}
-              </button>
+              {isRecording ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    stopRecording();
+                  }}
+                  style={{ pointerEvents: 'all', zIndex: 9999, cursor: 'pointer' }}
+                  className="flex h-20 w-20 items-center justify-center rounded-full bg-destructive hover:bg-destructive/90 transition-all shadow-lg"
+                >
+                  <Square className="h-8 w-8 text-destructive-foreground" fill="currentColor" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={startRecording}
+                  className="flex h-24 w-24 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-elevated hover:scale-105 transition-all"
+                >
+                  <Mic className="h-10 w-10" />
+                </button>
+              )}
               {isRecording && (
-                <span className="absolute inset-0 animate-pulse-ring rounded-full border-2 border-destructive" />
+                <span className="absolute inset-0 animate-pulse-ring rounded-full border-2 border-destructive pointer-events-none" />
               )}
             </div>
             {isRecording && (
