@@ -52,8 +52,24 @@ export default function PatientRegistration({ onSuccess }: { onSuccess?: () => v
   const createVisitForPatient = async (patientId: string) => {
     if (!profile?.clinic_id) return;
     try {
-      // Get next token number
       const today = new Date().toISOString().split("T")[0];
+
+      // Check for existing active visit today
+      const { data: existingVisit } = await supabase
+        .from("visits")
+        .select("id")
+        .eq("clinic_id", profile.clinic_id)
+        .eq("patient_id", patientId)
+        .eq("visit_date", today)
+        .in("status", ["waiting", "in_progress"])
+        .limit(1);
+
+      if (existingVisit && existingVisit.length > 0) {
+        toast.error("Patient already in today's queue");
+        return;
+      }
+
+      // Get next token number
       const { count } = await supabase
         .from("visits")
         .select("id", { count: "exact", head: true })
