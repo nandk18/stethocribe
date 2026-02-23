@@ -6,93 +6,87 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
 
   try {
+    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!anthropicKey) {
+      throw new Error("ANTHROPIC_API_KEY not configured");
+    }
+
     const { transcript, patient_context } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = `You are an expert medical scribe for Indian clinical settings. Convert the doctor's dictation or clinical notes into structured SOAP notes and extract prescriptions. The speech may be in English or Indian regional languages.
-
-Return ONLY valid JSON with this exact structure:
-{
-  "subjective": "Patient's symptoms, history, complaints in clear medical language",
-  "objective": "Physical examination findings, vitals, observable data",
-  "assessment": "Diagnosis, differential diagnoses, clinical reasoning",
-  "plan": "Treatment plan, follow-up instructions",
-  "medications": [{"name": "drug name", "dosage": "dose", "frequency": "how often", "duration": "how long", "instructions": "special instructions"}],
-  "investigations": ["list of recommended tests"],
-  "icd_suggestions": ["relevant ICD-10 codes"],
-  "follow_up_recommendation": "when to follow up"
-}
-
-If any section has no information, use an empty string or empty array. Be thorough and professional.`;
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "claude-opus-4-5",
+        max_tokens: 2000,
+        system: `You are an expert medical scribe for Indian outpatient clinics.
+Convert the doctor's dictation into structured clinical documentation.
+The dictation may be in English or any Indian regional language (Hindi, Tamil,
+Telugu, Kannada, Malayalam, Marathi, Bengali, Gujarati, Punjabi).
+Always write the output in English regardless of input language.
+
+Return ONLY a valid JSON object with no extra text, no markdown, no code blocks:
+{
+  "subjective": "patient complaint and history in clinical English",
+  "objective": "examination findings and vitals",
+  "assessment": "diagnosis or differential diagnosis",
+  "plan": "management plan",
+  "medications": [
+    {
+      "name": "drug name",
+      "dosage": "500mg",
+      "frequency": "TDS",
+      "duration": "5 days",
+      "instructions": "after food"
+    }
+  ],
+  "investigations": ["CBC", "Blood Sugar Fasting"],
+  "icd_suggestions": ["J06.9 - Acute upper respiratory infection"],
+  "follow_up_days": 5
+}`,
         messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: `Clinical notes/dictation:\n\n${transcript}${patient_context ? `\n\nPatient context: ${JSON.stringify(patient_context)}` : ""}` },
+          {
+            role: "user",
+            content: `Patient context: ${JSON.stringify(patient_context || {})}
+
+Doctor's dictation to convert:
+"${transcript}"
+
+Convert this into the structured SOAP JSON format.`,
+          },
         ],
       }),
     });
 
     if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits to continue." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const errText = await response.text();
-      console.error("AI gateway error:", response.status, errText);
-      throw new Error("AI processing failed");
+      const error = await response.text();
+      console.error("Claude API error:", response.status, error);
+      throw new Error(`Claude API error: ${response.status}`);
     }
 
-    const aiResult = await response.json();
-    const content = aiResult.choices?.[0]?.message?.content;
+    const claudeResponse = await response.json();
+    const content = claudeResponse.content[0].text;
 
-    // Parse the JSON from the AI response
-    let parsed;
-    try {
-      // Try to extract JSON from potential markdown code blocks
-      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-      parsed = JSON.parse(jsonMatch ? jsonMatch[1].trim() : content.trim());
-    } catch {
-      // If parsing fails, return the raw content as subjective
-      parsed = {
-        subjective: content,
-        objective: "",
-        assessment: "",
-        plan: "",
-        medications: [],
-        investigations: [],
-        icd_suggestions: [],
-        follow_up_recommendation: "",
-      };
-    }
+    const cleaned = content.replace(/```json|```/g, "").trim();
+    const soapData = JSON.parse(cleaned);
 
-    return new Response(JSON.stringify(parsed), {
+    return new Response(JSON.stringify(soapData), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (e) {
-    console.error("format-soap-notes error:", e);
+  } catch (error) {
+    console.error("format-soap-notes error:", error);
     return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });
