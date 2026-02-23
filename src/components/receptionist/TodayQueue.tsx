@@ -13,7 +13,7 @@ type Visit = {
   chief_complaint: string | null;
   vitals: any;
   created_at: string;
-  patient: { id: string; name: string; gender: string | null; dob: string | null; allergies: any } | null;
+  patient: { id: string; name: string; healthcare_id: string | null; gender: string | null; dob: string | null; allergies: any } | null;
 };
 
 export default function TodayQueue() {
@@ -26,7 +26,7 @@ export default function TodayQueue() {
     const today = new Date().toISOString().split("T")[0];
     const { data, error } = await supabase
       .from("visits")
-      .select("id, token_number, status, chief_complaint, vitals, created_at, patients!inner(id, name, gender, dob, allergies)")
+      .select("id, token_number, status, chief_complaint, vitals, created_at, patients!inner(id, name, healthcare_id, gender, dob, allergies)")
       .eq("clinic_id", profile.clinic_id)
       .eq("visit_date", today)
       .order("token_number", { ascending: true });
@@ -109,6 +109,9 @@ export default function TodayQueue() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-medium text-foreground truncate">{visit.patient?.name}</p>
+              {visit.patient?.healthcare_id && (
+                <p className="font-mono text-[10px] text-primary">{visit.patient.healthcare_id}</p>
+              )}
               <p className="text-xs text-muted-foreground truncate">
                 {visit.chief_complaint || "No complaint recorded"}
               </p>

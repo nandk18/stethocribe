@@ -183,8 +183,11 @@ export type Database = {
           created_at: string | null
           dob: string | null
           email: string | null
+          first_name: string | null
           gender: string | null
+          healthcare_id: string | null
           id: string
+          last_name: string | null
           name: string
           phone: string | null
         }
@@ -196,8 +199,11 @@ export type Database = {
           created_at?: string | null
           dob?: string | null
           email?: string | null
+          first_name?: string | null
           gender?: string | null
+          healthcare_id?: string | null
           id?: string
+          last_name?: string | null
           name: string
           phone?: string | null
         }
@@ -209,8 +215,11 @@ export type Database = {
           created_at?: string | null
           dob?: string | null
           email?: string | null
+          first_name?: string | null
           gender?: string | null
+          healthcare_id?: string | null
           id?: string
+          last_name?: string | null
           name?: string
           phone?: string | null
         }

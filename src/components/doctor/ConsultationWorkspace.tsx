@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Mic, MicOff, FileText, Pill, CheckCircle, AlertTriangle, Activity } from "lucide-react";
+import { Mic, FileText, Pill, CheckCircle, AlertTriangle, Activity, History } from "lucide-react";
 import VoiceRecorder from "@/components/doctor/VoiceRecorder";
+import PatientHistory from "@/components/doctor/PatientHistory";
 
 type Visit = {
   id: string;
@@ -20,8 +21,8 @@ type Visit = {
   vitals: any;
   patient_id: string;
   patient: {
-    id: string; name: string; gender: string | null; dob: string | null;
-    allergies: any; chronic_conditions: any;
+    id: string; name: string; healthcare_id?: string | null; gender: string | null; dob: string | null;
+    blood_group?: string | null; allergies: any; chronic_conditions: any;
   } | null;
 };
 
@@ -73,7 +74,6 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
   const handleCompleteConsultation = async () => {
     setSaving(true);
     try {
-      // Get doctor record
       const { data: doctor } = await supabase
         .from("doctors")
         .select("id")
@@ -82,14 +82,12 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
 
       if (!doctor) throw new Error("Doctor profile not found");
 
-      // Save clinical notes
       await supabase.from("clinical_notes").insert({
         visit_id: visit.id,
         doctor_id: doctor.id,
         soap_notes: { subjective, objective, assessment, plan },
       });
 
-      // Save prescription
       const validMeds = medications.filter(m => m.name.trim());
       if (validMeds.length > 0 || investigations.trim()) {
         await supabase.from("prescriptions").insert({
@@ -102,7 +100,6 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
         });
       }
 
-      // Mark visit complete
       await supabase.from("visits").update({ status: "completed", doctor_id: doctor.id }).eq("id", visit.id);
 
       toast.success("Consultation completed!");
@@ -126,18 +123,36 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
               </div>
               <div>
                 <h2 className="font-display text-xl font-bold text-foreground">{visit.patient?.name}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {visit.patient?.gender} • {getAge(visit.patient?.dob ?? null)}y
-                  {visit.chief_complaint && ` • ${visit.chief_complaint}`}
-                </p>
+                <div className="flex items-center gap-2">
+                  {visit.patient?.healthcare_id && (
+                    <span className="font-mono text-xs text-primary">{visit.patient.healthcare_id}</span>
+                  )}
+                  <span className="text-sm text-muted-foreground">
+                    {visit.patient?.gender} • {getAge(visit.patient?.dob ?? null)}y
+                    {visit.patient?.blood_group && ` • ${visit.patient.blood_group}`}
+                  </span>
+                </div>
+                {visit.chief_complaint && (
+                  <p className="text-sm font-medium text-foreground mt-1 bg-warning/10 text-warning px-2 py-0.5 rounded inline-block">
+                    {visit.chief_complaint}
+                  </p>
+                )}
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {visit.patient?.allergies && Array.isArray(visit.patient.allergies) && visit.patient.allergies.length > 0 && (
-                <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive">
-                  <AlertTriangle className="mr-1 h-3 w-3" />
-                  {(visit.patient.allergies as string[]).join(", ")}
-                </Badge>
+                (visit.patient.allergies as string[]).map((a: string) => (
+                  <Badge key={a} variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive">
+                    <AlertTriangle className="mr-1 h-3 w-3" /> {a}
+                  </Badge>
+                ))
+              )}
+              {visit.patient?.chronic_conditions && Array.isArray(visit.patient.chronic_conditions) && visit.patient.chronic_conditions.length > 0 && (
+                (visit.patient.chronic_conditions as string[]).map((c: string) => (
+                  <Badge key={c} variant="outline" className="border-warning/30 bg-warning/10 text-warning">
+                    {c}
+                  </Badge>
+                ))
               )}
             </div>
           </div>
@@ -164,6 +179,7 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="summary">Summary</TabsTrigger>
+          <TabsTrigger value="history"><History className="mr-1.5 h-3.5 w-3.5" /> History</TabsTrigger>
           <TabsTrigger value="record"><Mic className="mr-1.5 h-3.5 w-3.5" /> Voice Record</TabsTrigger>
           <TabsTrigger value="soap"><FileText className="mr-1.5 h-3.5 w-3.5" /> SOAP Notes</TabsTrigger>
           <TabsTrigger value="prescription"><Pill className="mr-1.5 h-3.5 w-3.5" /> Prescription</TabsTrigger>
@@ -175,7 +191,9 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
               <h3 className="font-display font-semibold mb-3">Patient Summary</h3>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div><Label className="text-xs text-muted-foreground">Full Name</Label><p className="font-medium">{visit.patient?.name}</p></div>
+                <div><Label className="text-xs text-muted-foreground">Healthcare ID</Label><p className="font-mono font-medium text-primary">{visit.patient?.healthcare_id || "—"}</p></div>
                 <div><Label className="text-xs text-muted-foreground">Age / Gender</Label><p className="font-medium">{getAge(visit.patient?.dob ?? null)}y / {visit.patient?.gender}</p></div>
+                <div><Label className="text-xs text-muted-foreground">Blood Group</Label><p className="font-medium">{visit.patient?.blood_group || "—"}</p></div>
                 <div><Label className="text-xs text-muted-foreground">Chief Complaint</Label><p className="font-medium">{visit.chief_complaint || "—"}</p></div>
                 <div><Label className="text-xs text-muted-foreground">Chronic Conditions</Label>
                   <p className="font-medium">
@@ -186,6 +204,12 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="history">
+          {visit.patient && (
+            <PatientHistory patientId={visit.patient.id} currentVisitId={visit.id} />
+          )}
         </TabsContent>
 
         <TabsContent value="record">
