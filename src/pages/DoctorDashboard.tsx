@@ -16,13 +16,14 @@ type Visit = {
   vitals: any;
   created_at: string;
   patient_id: string;
-  patient: { id: string; name: string; gender: string | null; dob: string | null; allergies: any; chronic_conditions: any } | null;
+  patient: { id: string; name: string; healthcare_id: string | null; gender: string | null; dob: string | null; blood_group: string | null; allergies: any; chronic_conditions: any } | null;
 };
 
 export default function DoctorDashboard() {
   const { profile } = useAuth();
   const [visits, setVisits] = useState<Visit[]>([]);
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
+  // Note: healthcare_id is fetched via the patients join below
   const [loading, setLoading] = useState(true);
 
   const fetchVisits = useCallback(async () => {
@@ -30,7 +31,7 @@ export default function DoctorDashboard() {
     const today = new Date().toISOString().split("T")[0];
     const { data, error } = await supabase
       .from("visits")
-      .select("id, token_number, status, chief_complaint, vitals, created_at, patient_id, patients!inner(id, name, gender, dob, allergies, chronic_conditions)")
+      .select("id, token_number, status, chief_complaint, vitals, created_at, patient_id, patients!inner(id, name, healthcare_id, gender, dob, blood_group, allergies, chronic_conditions)")
       .eq("clinic_id", profile.clinic_id)
       .eq("visit_date", today)
       .in("status", ["waiting", "in_progress"])
@@ -104,6 +105,9 @@ export default function DoctorDashboard() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm text-foreground truncate">{visit.patient?.name}</p>
+                        {visit.patient?.healthcare_id && (
+                          <p className="font-mono text-[10px] text-primary">{visit.patient.healthcare_id}</p>
+                        )}
                         <p className="text-xs text-muted-foreground">
                           {visit.patient?.gender && `${visit.patient.gender}`}
                           {visit.patient?.dob && `, ${getAge(visit.patient.dob)}y`}

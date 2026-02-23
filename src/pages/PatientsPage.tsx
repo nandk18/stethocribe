@@ -13,6 +13,7 @@ import { Search, UserPlus, User, Phone, Mail, Loader2 } from "lucide-react";
 type Patient = {
   id: string;
   name: string;
+  healthcare_id: string | null;
   gender: string | null;
   dob: string | null;
   phone: string | null;
@@ -33,7 +34,7 @@ export default function PatientsPage() {
     if (!profile?.clinic_id) return;
     let query = supabase.from("patients").select("*").eq("clinic_id", profile.clinic_id).order("created_at", { ascending: false });
     if (search.trim()) {
-      query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`);
+      query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%,healthcare_id.ilike.%${search}%`);
     }
     const { data } = await query.limit(100);
     if (data) setPatients(data);
@@ -90,6 +91,9 @@ export default function PatientsPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-foreground truncate">{p.name}</p>
+                  {p.healthcare_id && (
+                    <p className="font-mono text-[10px] text-primary">{p.healthcare_id}</p>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     {p.gender}{p.dob && `, ${getAge(p.dob)}y`}{p.blood_group && ` · ${p.blood_group}`}
                   </p>
