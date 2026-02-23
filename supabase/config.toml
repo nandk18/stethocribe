@@ -2,3 +2,6 @@ project_id = "hwvtzapsmjptqilrzsfi"
 
 [functions.format-soap-notes]
 verify_jwt = false
+
+[functions.transcribe-audio]
+verify_jwt = false

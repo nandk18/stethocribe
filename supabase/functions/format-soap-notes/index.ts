@@ -68,9 +68,34 @@ Convert this into the structured SOAP JSON format.`,
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error("Claude API error:", response.status, error);
-      throw new Error(`Claude API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error("Claude API error:", response.status, errorText);
+
+      let errorMessage: string;
+      let errorCode: string;
+
+      if (response.status === 401) {
+        errorMessage = "Anthropic API key is invalid. Please check your API key.";
+        errorCode = "invalid_key";
+      } else if (response.status === 429) {
+        errorMessage = "Anthropic account has no credits. Please add billing at console.anthropic.com";
+        errorCode = "no_credits";
+      } else {
+        let parsed: string;
+        try {
+          const json = JSON.parse(errorText);
+          parsed = json.error?.message || errorText;
+        } catch {
+          parsed = errorText;
+        }
+        errorMessage = `SOAP formatting failed: ${parsed}`;
+        errorCode = "api_error";
+      }
+
+      return new Response(
+        JSON.stringify({ error: errorMessage, error_code: errorCode, status: response.status }),
+        { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     const claudeResponse = await response.json();
@@ -85,7 +110,7 @@ Convert this into the structured SOAP JSON format.`,
   } catch (error) {
     console.error("format-soap-notes error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error", error_code: "internal" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }

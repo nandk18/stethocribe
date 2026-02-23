@@ -42,16 +42,84 @@ export default function VoiceRecorder({ visitId, onTranscriptProcessed }: Props)
   const handleTranscription = useCallback(async (audioBlob: Blob) => {
     setIsTranscribing(true);
     try {
-      // For now, audio-to-text requires Whisper; fall back to manual
-      toast.info("Voice-to-text requires API key setup. Please type your notes manually.");
-      setManualMode(true);
-    } catch {
-      toast.error("Transcription failed. Type your notes manually.");
+      const formData = new FormData();
+      formData.append("audio", audioBlob, "recording.webm");
+
+      const { data, error } = await supabase.functions.invoke("transcribe-audio", {
+        body: formData,
+      });
+
+      if (error) {
+        // Try to parse the error body for specific messages
+        let msg = "Transcription failed. Please try again.";
+        try {
+          const parsed = typeof error === "string" ? JSON.parse(error) : error;
+          if (parsed?.context?.body) {
+            const body = JSON.parse(parsed.context.body);
+            msg = body.error || msg;
+          }
+        } catch {
+          // Use default message
+        }
+        toast.error(msg);
+        setManualMode(true);
+        return;
+      }
+
+      if (data?.error) {
+        toast.error(data.error);
+        setManualMode(true);
+        return;
+      }
+
+      if (data?.transcript) {
+        setTranscript(data.transcript);
+        toast.success("Transcription complete! Processing SOAP notes...");
+        // Auto-process through Claude
+        try {
+          const { data: soapData, error: soapError } = await supabase.functions.invoke("format-soap-notes", {
+            body: { transcript: data.transcript },
+          });
+
+          if (soapError) {
+            let soapMsg = "Failed to generate SOAP notes.";
+            try {
+              const parsed = typeof soapError === "string" ? JSON.parse(soapError) : soapError;
+              if (parsed?.context?.body) {
+                const body = JSON.parse(parsed.context.body);
+                soapMsg = body.error || soapMsg;
+              }
+            } catch {
+              // Use default
+            }
+            toast.error(soapMsg);
+            setManualMode(true);
+            return;
+          }
+
+          if (soapData?.error) {
+            toast.error(soapData.error);
+            setManualMode(true);
+            return;
+          }
+
+          onTranscriptProcessed(soapData);
+          toast.success("SOAP notes generated!");
+        } catch (err: any) {
+          toast.error(err.message || "Failed to process SOAP notes");
+          setManualMode(true);
+        }
+      } else {
+        toast.error("No transcript received. Please type your notes manually.");
+        setManualMode(true);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Transcription failed. Type your notes manually.");
       setManualMode(true);
     } finally {
       setIsTranscribing(false);
     }
-  }, []);
+  }, [onTranscriptProcessed]);
 
   const startRecording = async () => {
     try {
@@ -102,7 +170,27 @@ export default function VoiceRecorder({ visitId, onTranscriptProcessed }: Props)
       const { data, error } = await supabase.functions.invoke("format-soap-notes", {
         body: { transcript: transcript.trim() },
       });
-      if (error) throw error;
+
+      if (error) {
+        let msg = "Failed to generate SOAP notes.";
+        try {
+          const parsed = typeof error === "string" ? JSON.parse(error) : error;
+          if (parsed?.context?.body) {
+            const body = JSON.parse(parsed.context.body);
+            msg = body.error || msg;
+          }
+        } catch {
+          // Use default
+        }
+        toast.error(msg);
+        return;
+      }
+
+      if (data?.error) {
+        toast.error(data.error);
+        return;
+      }
+
       onTranscriptProcessed(data);
       toast.success("SOAP notes generated!");
     } catch (err: any) {
