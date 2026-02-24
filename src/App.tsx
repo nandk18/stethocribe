@@ -8,6 +8,7 @@ import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import ReceptionistDashboard from "./pages/ReceptionistDashboard";
 import DoctorDashboard from "./pages/DoctorDashboard";
+import DoctorConsultationPage from "./pages/DoctorConsultationPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import PatientsPage from "./pages/PatientsPage";
 import Settings from "./pages/Settings";
@@ -80,6 +81,9 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/dashboard" element={<DashboardComponent />} />
+      <Route path="/dashboard/consultation/:visitId" element={
+        role === "doctor" || role === "admin" ? <DoctorConsultationPage /> : <Navigate to="/dashboard" replace />
+      } />
       <Route path="/dashboard/patients" element={<PatientsPage />} />
       <Route path="/dashboard/settings" element={<Settings />} />
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

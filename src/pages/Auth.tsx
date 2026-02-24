@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Stethoscope } from "lucide-react";
 
@@ -13,12 +14,39 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [selectedRole, setSelectedRole] = useState<string>("admin");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) toast.error(error.message);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) { toast.error(error.message); setLoading(false); return; }
+
+      // Validate role matches
+      const { data: profile, error: profileErr } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("user_id", data.user.id)
+        .single();
+
+      if (profileErr || !profile) {
+        toast.error("Profile not found. Please contact admin.");
+        await supabase.auth.signOut();
+        setLoading(false);
+        return;
+      }
+
+      if (profile.role !== selectedRole) {
+        toast.error(`You don't have access as ${selectedRole}. Your role is ${profile.role}.`);
+        await supabase.auth.signOut();
+        setLoading(false);
+        return;
+      }
+      // Auth state change listener in useAuth will handle the redirect
+    } catch (err: any) {
+      toast.error(err.message);
+    }
     setLoading(false);
   };
 
@@ -61,6 +89,19 @@ export default function Auth() {
             <CardContent>
               <TabsContent value="login" className="mt-0">
                 <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="login-role">Login As</Label>
+                    <Select value={selectedRole} onValueChange={setSelectedRole}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="doctor">Doctor</SelectItem>
+                        <SelectItem value="receptionist">Receptionist</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="login-email">Email</Label>
                     <Input id="login-email" type="email" placeholder="doctor@clinic.com" value={email} onChange={e => setEmail(e.target.value)} required />

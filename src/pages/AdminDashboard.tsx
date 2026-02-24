@@ -4,13 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PatientRegistration from "@/components/receptionist/PatientRegistration";
 import TodayQueue from "@/components/receptionist/TodayQueue";
-import ConsultationWorkspace from "@/components/doctor/ConsultationWorkspace";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { CalendarDays, Stethoscope, UserPlus } from "lucide-react";
+import { CalendarDays, Stethoscope, UserPlus, Clock, AlertTriangle, ArrowRight, Eye } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 type Visit = {
   id: string;
@@ -20,13 +20,13 @@ type Visit = {
   vitals: any;
   created_at: string;
   patient_id: string;
-  patient: { id: string; name: string; gender: string | null; dob: string | null; allergies: any; chronic_conditions: any } | null;
+  patient: { id: string; name: string; healthcare_id: string | null; gender: string | null; dob: string | null; allergies: any; chronic_conditions: any } | null;
 };
 
 function AdminQueueView() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const [visits, setVisits] = useState<Visit[]>([]);
-  const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [loading, setLoading] = useState(true);
   const [addPatientOpen, setAddPatientOpen] = useState(false);
 
@@ -35,7 +35,7 @@ function AdminQueueView() {
     const today = new Date().toISOString().split("T")[0];
     const { data } = await supabase
       .from("visits")
-      .select("id, token_number, status, chief_complaint, vitals, created_at, patient_id, patients!inner(id, name, gender, dob, allergies, chronic_conditions)")
+      .select("id, token_number, status, chief_complaint, vitals, created_at, patient_id, patients!inner(id, name, healthcare_id, gender, dob, allergies, chronic_conditions)")
       .eq("clinic_id", profile.clinic_id)
       .eq("visit_date", today)
       .order("token_number", { ascending: true });
@@ -64,6 +64,20 @@ function AdminQueueView() {
     return Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
   };
 
+  const getWaitTime = (createdAt: string) => {
+    const diff = Date.now() - new Date(createdAt).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m`;
+    return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+  };
+
+  const handleStartConsultation = async (visit: Visit) => {
+    if (visit.status === "waiting") {
+      await supabase.from("visits").update({ status: "in_progress" }).eq("id", visit.id);
+    }
+    navigate(`/dashboard/consultation/${visit.id}`);
+  };
+
   return (
     <Tabs defaultValue="reception" className="space-y-4">
       <div className="flex items-center justify-between">
@@ -87,47 +101,59 @@ function AdminQueueView() {
       </TabsContent>
 
       <TabsContent value="doctor">
-        <div className="flex h-[calc(100vh-14rem)] gap-6">
-          <div className="w-80 flex-shrink-0 overflow-auto">
-            <h2 className="font-display text-lg font-bold text-foreground mb-4">Active Queue</h2>
-            <div className="space-y-2">
-              {loading ? (
-                [1,2,3].map(i => <div key={i} className="h-20 animate-pulse rounded-lg bg-muted" />)
-              ) : visits.filter(v => v.status === "waiting" || v.status === "in_progress").length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">No patients waiting</p>
-              ) : (
-                visits.filter(v => v.status === "waiting" || v.status === "in_progress").map(visit => (
-                  <Card key={visit.id} className={`cursor-pointer shadow-card transition-all hover:shadow-elevated ${selectedVisit?.id === visit.id ? "ring-2 ring-primary" : ""}`}
-                    onClick={() => { if (visit.status === "waiting") supabase.from("visits").update({ status: "in_progress" }).eq("id", visit.id); setSelectedVisit(visit); }}>
-                    <CardContent className="p-3">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 font-display text-sm font-bold text-primary">#{visit.token_number}</div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{visit.patient?.name}</p>
-                          <p className="text-xs text-muted-foreground">{visit.patient?.gender}{visit.patient?.dob && `, ${getAge(visit.patient.dob)}y`}</p>
-                          {visit.chief_complaint && <p className="text-xs text-muted-foreground mt-1 truncate">{visit.chief_complaint}</p>}
-                          <Badge variant="outline" className={`text-[10px] mt-1 ${statusColor(visit.status)}`}>{visit.status.replace("_", " ")}</Badge>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
+        <div className="space-y-3">
+          {loading ? (
+            [1, 2, 3].map(i => <div key={i} className="h-20 animate-pulse rounded-lg bg-muted" />)
+          ) : visits.filter(v => v.status === "waiting" || v.status === "in_progress").length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <Stethoscope className="mb-4 h-16 w-16 text-muted-foreground/20" />
+              <p className="text-sm text-muted-foreground">No patients waiting</p>
             </div>
-          </div>
-          <div className="flex-1 overflow-auto">
-            {selectedVisit ? (
-              <ConsultationWorkspace visit={selectedVisit} onComplete={() => { setSelectedVisit(null); fetchVisits(); }} />
-            ) : (
-              <div className="flex h-full items-center justify-center">
-                <div className="text-center">
-                  <Stethoscope className="mx-auto mb-4 h-16 w-16 text-muted-foreground/20" />
-                  <h3 className="font-display text-lg font-semibold text-muted-foreground">Select a patient</h3>
-                  <p className="text-sm text-muted-foreground">Click on a patient from the queue to begin consultation</p>
-                </div>
-              </div>
-            )}
-          </div>
+          ) : (
+            visits.filter(v => v.status === "waiting" || v.status === "in_progress").map(visit => (
+              <Card
+                key={visit.id}
+                className="shadow-card transition-all hover:shadow-elevated cursor-pointer"
+                onClick={() => handleStartConsultation(visit)}
+              >
+                <CardContent className="flex items-center gap-4 p-4">
+                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 font-display text-lg font-bold text-primary">
+                    #{visit.token_number}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-foreground truncate">{visit.patient?.name}</p>
+                      {visit.patient?.healthcare_id && (
+                        <span className="font-mono text-[10px] text-primary">{visit.patient.healthcare_id}</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {visit.patient?.gender}{visit.patient?.dob && `, ${getAge(visit.patient.dob)}y`}
+                    </p>
+                    {visit.chief_complaint && <p className="text-xs text-muted-foreground mt-1 truncate">{visit.chief_complaint}</p>}
+                    <div className="mt-1 flex items-center gap-2">
+                      <Badge variant="outline" className={`text-[10px] ${statusColor(visit.status)}`}>{visit.status.replace("_", " ")}</Badge>
+                      {visit.patient?.allergies && Array.isArray(visit.patient.allergies) && visit.patient.allergies.length > 0 && (
+                        <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive text-[10px]">
+                          <AlertTriangle className="mr-1 h-2.5 w-2.5" /> Allergies
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                    {visit.status === "waiting" && (
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" /> {getWaitTime(visit.created_at)}
+                      </span>
+                    )}
+                    <Button size="sm" className="text-xs" onClick={(e) => { e.stopPropagation(); handleStartConsultation(visit); }}>
+                      {visit.status === "waiting" ? <><ArrowRight className="mr-1 h-3 w-3" /> Start</> : <><ArrowRight className="mr-1 h-3 w-3" /> Continue</>}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
       </TabsContent>
     </Tabs>
