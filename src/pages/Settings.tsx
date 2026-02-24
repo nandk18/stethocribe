@@ -7,9 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Building2, User, Save, Loader2 } from "lucide-react";
+import { Building2, User, Save, Loader2, UserPlus, Send, Smartphone } from "lucide-react";
 
 export default function Settings() {
   const { user, profile } = useAuth();
@@ -24,6 +24,11 @@ export default function Settings() {
   const [qualification, setQualification] = useState("");
   const [regNumber, setRegNumber] = useState("");
   const [specialty, setSpecialty] = useState("");
+
+  // Staff invite
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<string>("receptionist");
+  const [inviting, setInviting] = useState(false);
 
   useEffect(() => {
     if (clinic) {
@@ -78,6 +83,23 @@ export default function Settings() {
     finally { setSaving(false); }
   };
 
+  const handleInviteStaff = async () => {
+    if (!inviteEmail.trim() || !profile?.clinic_id) return;
+    setInviting(true);
+    try {
+      const { error } = await supabase.functions.invoke("invite-staff", {
+        body: { email: inviteEmail, role: inviteRole, clinic_id: profile.clinic_id },
+      });
+      if (error) throw error;
+      toast.success(`Invitation sent to ${inviteEmail} as ${inviteRole}`);
+      setInviteEmail("");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send invitation");
+    } finally {
+      setInviting(false);
+    }
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -121,7 +143,7 @@ export default function Settings() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2"><Label>Doctor Name</Label><Input value={doctorName} onChange={e => setDoctorName(e.target.value)} placeholder="Dr. Name" /></div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2"><Label>Qualification</Label><Input value={qualification} onChange={e => setQualification(e.target.value)} placeholder="MBBS, MD" /></div>
               <div className="space-y-2"><Label>Specialty</Label><Input value={specialty} onChange={e => setSpecialty(e.target.value)} placeholder="General Medicine" /></div>
             </div>
@@ -129,6 +151,53 @@ export default function Settings() {
             <Button onClick={handleSaveDoctor} disabled={saving}>
               <Save className="mr-2 h-4 w-4" /> {doctor ? "Update" : "Create"} Doctor Profile
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* Invite Staff */}
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 font-display">
+              <UserPlus className="h-5 w-5 text-primary" /> Invite Staff
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Invite doctors and receptionists to your clinic. They'll receive an email to create their account.
+            </p>
+            <div className="space-y-2">
+              <Label>Email Address</Label>
+              <Input type="email" placeholder="staff@clinic.com" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Select value={inviteRole} onValueChange={setInviteRole}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="doctor">Doctor</SelectItem>
+                  <SelectItem value="receptionist">Receptionist</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handleInviteStaff} disabled={inviting || !inviteEmail.trim()}>
+              <Send className="mr-2 h-4 w-4" /> {inviting ? "Sending..." : "Send Invitation"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Mobile App */}
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 font-display">
+              <Smartphone className="h-5 w-5 text-primary" /> Mobile App
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              To build the native app, export this project to GitHub, clone locally, run <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">npm run build && npx cap sync</code>, then open in Android Studio or Xcode.
+            </p>
           </CardContent>
         </Card>
       </div>
