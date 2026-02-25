@@ -5,6 +5,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import Auth from "./pages/Auth";
+import AcceptInvite from "./pages/AcceptInvite";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Onboarding from "./pages/Onboarding";
 import ReceptionistDashboard from "./pages/ReceptionistDashboard";
 import DoctorDashboard from "./pages/DoctorDashboard";
@@ -50,6 +53,9 @@ function AppRoutes() {
     return (
       <Routes>
         <Route path="/auth" element={<Auth />} />
+        <Route path="/accept-invite" element={<AcceptInvite />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/auth" replace />} />
       </Routes>
     );
