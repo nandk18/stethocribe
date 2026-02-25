@@ -27,7 +27,7 @@ serve(async (req) => {
     // Check caller is admin
     const { data: callerProfile } = await supabase
       .from("profiles")
-      .select("role, clinic_id")
+      .select("role, clinic_id, full_name")
       .eq("user_id", user.id)
       .single();
 
@@ -40,10 +40,25 @@ serve(async (req) => {
     if (clinic_id !== callerProfile.clinic_id) throw new Error("Clinic mismatch");
     if (!["doctor", "receptionist"].includes(role)) throw new Error("Invalid role");
 
+    // Get clinic name for the invite
+    const { data: clinic } = await supabase
+      .from("clinics")
+      .select("name")
+      .eq("id", clinic_id)
+      .single();
+
+    const origin = req.headers.get("origin") || "https://stethocribe.lovable.app";
+
     // Invite user via Supabase Auth Admin API
     const { data: inviteData, error: inviteErr } = await supabase.auth.admin.inviteUserByEmail(email, {
-      data: { full_name: email, invited_role: role, invited_clinic_id: clinic_id },
-      redirectTo: `${req.headers.get("origin") || supabaseUrl}/auth`,
+      data: {
+        full_name: email,
+        invited_role: role,
+        invited_clinic_id: clinic_id,
+        clinic_name: clinic?.name || "your clinic",
+        invited_by: callerProfile.full_name || "Admin",
+      },
+      redirectTo: `${origin}/accept-invite`,
     });
 
     if (inviteErr) throw inviteErr;
