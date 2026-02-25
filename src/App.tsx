@@ -92,6 +92,9 @@ function AppRoutes() {
       } />
       <Route path="/dashboard/patients" element={<PatientsPage />} />
       <Route path="/dashboard/settings" element={<Settings />} />
+      <Route path="/accept-invite" element={<AcceptInvite />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/auth" element={<Navigate to="/dashboard" replace />} />
       <Route path="/onboarding" element={<Navigate to="/dashboard" replace />} />
