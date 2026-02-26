@@ -72,6 +72,12 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
   };
 
   const handleCompleteConsultation = async () => {
+    // Validation: require at least an assessment
+    if (!assessment.trim()) {
+      toast.error("Please fill in at least the Assessment in SOAP notes before completing.");
+      setTab("soap");
+      return;
+    }
     setSaving(true);
     try {
       const { data: doctor } = await supabase
@@ -89,18 +95,30 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
       });
 
       const validMeds = medications.filter(m => m.name.trim());
+      let prescriptionId: string | null = null;
       if (validMeds.length > 0 || investigations.trim()) {
-        await supabase.from("prescriptions").insert({
+        const { data: prescData } = await supabase.from("prescriptions").insert({
           visit_id: visit.id,
           doctor_id: doctor.id,
           medications: validMeds,
           investigations: investigations ? investigations.split(",").map(s => s.trim()) : [],
           follow_up_date: followUpDate || null,
           notes: prescriptionNotes || null,
-        });
+        }).select("id").single();
+        prescriptionId = prescData?.id ?? null;
       }
 
       await supabase.from("visits").update({ status: "completed", doctor_id: doctor.id }).eq("id", visit.id);
+
+      // Trigger PDF generation in the background
+      if (prescriptionId) {
+        supabase.functions.invoke("generate-prescription-pdf", {
+          body: { visit_id: visit.id, prescription_id: prescriptionId },
+        }).then(({ error }) => {
+          if (error) console.error("PDF generation failed:", error);
+          else toast.success("Prescription PDF generated!");
+        });
+      }
 
       toast.success("Consultation completed!");
       onComplete();
