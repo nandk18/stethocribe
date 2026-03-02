@@ -73,7 +73,7 @@ export default function Auth() {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl gradient-primary shadow-elevated">
             <Stethoscope className="h-8 w-8 text-primary-foreground" />
           </div>
-          <h1 className="font-display text-3xl font-bold text-foreground">MediScribe Pro</h1>
+          <h1 className="font-display text-3xl font-bold text-foreground">StethoScribe</h1>
           <p className="mt-2 text-muted-foreground">AI-Powered Practice Management</p>
         </div>
 
