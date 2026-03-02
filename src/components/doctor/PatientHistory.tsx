@@ -4,7 +4,33 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Calendar, ChevronDown, FileText, Pill, ExternalLink } from "lucide-react";
+import { Calendar, ChevronDown, FileText, Pill, ExternalLink, Loader2 } from "lucide-react";
+
+function PrescriptionLinkButton({ pdfUrl }: { pdfUrl: string }) {
+  const [loading, setLoading] = useState(false);
+
+  const handleClick = async () => {
+    setLoading(true);
+    try {
+      const { data } = await supabase.storage
+        .from("prescriptions")
+        .createSignedUrl(pdfUrl, 600);
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, "_blank");
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Button variant="ghost" size="sm" className="text-xs h-7" onClick={handleClick} disabled={loading}>
+      {loading ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <ExternalLink className="mr-1 h-3 w-3" />} View Prescription
+    </Button>
+  );
+}
 
 type Props = {
   patientId: string;
@@ -136,11 +162,7 @@ export default function PatientHistory({ patientId, currentVisitId }: Props) {
                 )}
 
                 {pdfUrl && (
-                  <Button variant="ghost" size="sm" className="text-xs h-7" asChild>
-                    <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="mr-1 h-3 w-3" /> View Prescription
-                    </a>
-                  </Button>
+                  <PrescriptionLinkButton pdfUrl={pdfUrl} />
                 )}
               </div>
             </CardContent>
