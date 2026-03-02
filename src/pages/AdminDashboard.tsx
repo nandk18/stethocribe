@@ -80,14 +80,14 @@ function AdminQueueView() {
 
   return (
     <Tabs defaultValue="reception" className="space-y-4">
-      <div className="flex items-center justify-between">
-        <TabsList>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <TabsList className="w-full sm:w-auto overflow-x-auto">
           <TabsTrigger value="reception"><CalendarDays className="mr-2 h-4 w-4" /> Reception View</TabsTrigger>
           <TabsTrigger value="doctor"><Stethoscope className="mr-2 h-4 w-4" /> Doctor View</TabsTrigger>
         </TabsList>
         <Dialog open={addPatientOpen} onOpenChange={setAddPatientOpen}>
           <DialogTrigger asChild>
-            <Button size="sm"><UserPlus className="mr-2 h-4 w-4" /> Add Patient</Button>
+            <Button size="sm" className="w-full sm:w-auto"><UserPlus className="mr-2 h-4 w-4" /> Add Patient</Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-auto">
             <DialogHeader><DialogTitle>Register & Queue Patient</DialogTitle></DialogHeader>
