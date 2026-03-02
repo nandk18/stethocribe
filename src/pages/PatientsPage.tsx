@@ -85,26 +85,28 @@ export default function PatientsPage() {
         <div className="space-y-2">
           {patients.map(p => (
             <Card key={p.id} className="shadow-card hover:shadow-elevated transition-shadow">
-              <CardContent className="flex items-center gap-4 p-4">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 font-display text-sm font-bold text-primary">
-                  {p.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-foreground truncate">{p.name}</p>
-                  {p.healthcare_id && (
-                    <p className="font-mono text-[10px] text-primary">{p.healthcare_id}</p>
+              <CardContent className="flex flex-col sm:flex-row sm:items-center gap-3 p-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 font-display text-sm font-bold text-primary">
+                    {p.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground truncate">{p.name}</p>
+                    {p.healthcare_id && (
+                      <p className="font-mono text-[10px] text-primary">{p.healthcare_id}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {p.gender}{p.dob && `, ${getAge(p.dob)}y`}{p.blood_group && ` · ${p.blood_group}`}
+                    </p>
+                  </div>
+                  {p.allergies && Array.isArray(p.allergies) && p.allergies.length > 0 && (
+                    <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive text-[10px] flex-shrink-0">Allergies</Badge>
                   )}
-                  <p className="text-xs text-muted-foreground">
-                    {p.gender}{p.dob && `, ${getAge(p.dob)}y`}{p.blood_group && ` · ${p.blood_group}`}
-                  </p>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground pl-13 sm:pl-0 sm:ml-auto">
                   {p.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{p.phone}</span>}
-                  {p.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{p.email}</span>}
+                  {p.email && <span className="flex items-center gap-1 truncate max-w-[200px]"><Mail className="h-3 w-3" />{p.email}</span>}
                 </div>
-                {p.allergies && Array.isArray(p.allergies) && p.allergies.length > 0 && (
-                  <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive text-[10px]">Allergies</Badge>
-                )}
               </CardContent>
             </Card>
           ))}
