@@ -67,12 +67,28 @@ export default function Settings() {
   const fetchTeam = async () => {
     if (!profile?.clinic_id) return;
     setLoadingTeam(true);
-    const { data } = await supabase
+    // Fetch profiles with clinic_id
+    const { data: profileData } = await supabase
       .from("profiles")
       .select("user_id, full_name, role, created_at")
       .eq("clinic_id", profile.clinic_id)
       .order("role");
-    setTeam(data || []);
+    
+    // Also fetch doctors to catch any staff whose profile clinic_id might not be set
+    const { data: doctorData } = await supabase
+      .from("doctors")
+      .select("user_id, name, qualification, specialty")
+      .eq("clinic_id", profile.clinic_id);
+    
+    const merged = [...(profileData || [])];
+    const existingIds = new Set(merged.map(m => m.user_id));
+    // Add any doctors not already in profile results
+    (doctorData || []).forEach(d => {
+      if (!existingIds.has(d.user_id)) {
+        merged.push({ user_id: d.user_id, full_name: d.name, role: "doctor" as any, created_at: null });
+      }
+    });
+    setTeam(merged);
     setLoadingTeam(false);
   };
 
@@ -301,26 +317,34 @@ export default function Settings() {
                 <p className="text-sm text-muted-foreground">No team members yet. Invite staff above.</p>
               ) : (
                 <div className="space-y-3">
-                  {team.map((member) => (
-                    <div key={member.user_id} className="flex items-center justify-between rounded-lg border border-border p-3">
-                      <div className="flex items-center gap-3">
-                        <div>
-                          <p className="font-medium text-foreground text-sm">{member.full_name || "Unnamed"}</p>
-                          <Badge variant="secondary" className="capitalize text-xs mt-0.5">{member.role}</Badge>
+                  {team.map((member) => {
+                    const roleBg = member.role === "admin" ? "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400"
+                      : member.role === "doctor" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                      : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400";
+                    return (
+                      <div key={member.user_id} className="flex items-center justify-between rounded-lg border border-border p-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 font-display text-sm font-bold text-primary">
+                            {(member.full_name || "?").charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-medium text-foreground text-sm">{member.full_name || "Unnamed"}</p>
+                            <Badge className={`capitalize text-xs mt-0.5 ${roleBg} border-0`}>{member.role}</Badge>
+                          </div>
                         </div>
+                        {member.user_id !== user?.id && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleRemoveStaff(member.user_id, member.full_name)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
-                      {member.user_id !== user?.id && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => handleRemoveStaff(member.user_id, member.full_name)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

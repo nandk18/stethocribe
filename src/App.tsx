@@ -14,6 +14,7 @@ import DoctorDashboard from "./pages/DoctorDashboard";
 import DoctorConsultationPage from "./pages/DoctorConsultationPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import PatientsPage from "./pages/PatientsPage";
+import PatientDetailPage from "./pages/PatientDetailPage";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import { useEffect, useState } from "react";
@@ -91,6 +92,7 @@ function AppRoutes() {
         role === "doctor" || role === "admin" ? <DoctorConsultationPage /> : <Navigate to="/dashboard" replace />
       } />
       <Route path="/dashboard/patients" element={<PatientsPage />} />
+      <Route path="/dashboard/patients/:patientId" element={<PatientDetailPage />} />
       <Route path="/dashboard/settings" element={<Settings />} />
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />

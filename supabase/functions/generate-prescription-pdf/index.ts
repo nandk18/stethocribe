@@ -19,44 +19,17 @@ serve(async (req) => {
     );
 
     const { visit_id, prescription_id } = await req.json();
-    if (!visit_id || !prescription_id) {
-      throw new Error("visit_id and prescription_id are required");
-    }
+    if (!visit_id || !prescription_id) throw new Error("visit_id and prescription_id are required");
 
-    // Fetch all needed data
-    const { data: prescription, error: pErr } = await supabaseAdmin
-      .from("prescriptions")
-      .select("*")
-      .eq("id", prescription_id)
-      .single();
+    const { data: prescription, error: pErr } = await supabaseAdmin.from("prescriptions").select("*").eq("id", prescription_id).single();
     if (pErr || !prescription) throw new Error("Prescription not found");
 
-    const { data: visit } = await supabaseAdmin
-      .from("visits")
-      .select("*, patients(*)")
-      .eq("id", visit_id)
-      .single();
+    const { data: visit } = await supabaseAdmin.from("visits").select("*, patients(*)").eq("id", visit_id).single();
     if (!visit) throw new Error("Visit not found");
 
-    const { data: doctor } = await supabaseAdmin
-      .from("doctors")
-      .select("*")
-      .eq("id", prescription.doctor_id)
-      .single();
-
-    const { data: clinic } = await supabaseAdmin
-      .from("clinics")
-      .select("*")
-      .eq("id", visit.clinic_id)
-      .single();
-
-    const { data: notes } = await supabaseAdmin
-      .from("clinical_notes")
-      .select("soap_notes")
-      .eq("visit_id", visit_id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
+    const { data: doctor } = await supabaseAdmin.from("doctors").select("*").eq("id", prescription.doctor_id).single();
+    const { data: clinic } = await supabaseAdmin.from("clinics").select("*").eq("id", visit.clinic_id).single();
+    const { data: notes } = await supabaseAdmin.from("clinical_notes").select("soap_notes").eq("visit_id", visit_id).order("created_at", { ascending: false }).limit(1).single();
 
     const patient = visit.patients;
     const soap = notes?.soap_notes || {};
@@ -69,73 +42,73 @@ serve(async (req) => {
       return String(Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000)));
     };
 
-    // Generate HTML for PDF
     const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8">
+<html><head><meta charset="UTF-8">
 <style>
+  @page { size: A4; margin: 20mm 15mm; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #1a1a1a; padding: 24px; max-width: 800px; margin: 0 auto; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #2563eb; padding-bottom: 12px; margin-bottom: 16px; }
-  .clinic-name { font-size: 18px; font-weight: 700; color: #2563eb; }
-  .clinic-info { font-size: 10px; color: #666; margin-top: 2px; }
-  .doctor-info { text-align: right; }
-  .doctor-name { font-size: 14px; font-weight: 600; }
-  .doctor-detail { font-size: 10px; color: #666; }
-  .patient-bar { display: flex; justify-content: space-between; background: #f0f4ff; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; }
-  .patient-bar span { font-size: 11px; }
-  .patient-bar strong { color: #2563eb; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #1a1a1a; padding: 24px; max-width: 800px; margin: 0 auto; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #0D6E6E; padding-bottom: 12px; margin-bottom: 14px; }
+  .clinic-name { font-size: 20px; font-weight: 800; color: #0D6E6E; }
+  .clinic-sub { font-size: 10px; color: #555; margin-top: 3px; line-height: 1.5; }
+  .doctor-block { text-align: right; }
+  .doctor-name { font-size: 14px; font-weight: 700; }
+  .doctor-sub { font-size: 10px; color: #555; line-height: 1.6; }
+  .patient-bar { background: #f0faf9; border: 1px solid rgba(13,110,110,0.2); border-radius: 6px; padding: 10px 14px; margin-bottom: 12px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .field label { font-size: 9px; color: #777; text-transform: uppercase; font-weight: 600; }
+  .field p { font-size: 11px; font-weight: 600; margin-top: 1px; }
+  .vitals-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .vital { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; padding: 4px 10px; font-size: 10px; }
+  .vital span { font-weight: 700; color: #0D6E6E; }
   .section { margin-bottom: 14px; }
-  .section-title { font-size: 12px; font-weight: 700; color: #2563eb; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e5e7eb; padding-bottom: 3px; margin-bottom: 6px; }
-  .soap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .soap-item label { font-weight: 600; font-size: 10px; color: #666; text-transform: uppercase; }
-  .soap-item p { margin-top: 2px; font-size: 11px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-  th { background: #2563eb; color: #fff; font-size: 10px; padding: 6px 8px; text-align: left; }
-  td { border-bottom: 1px solid #e5e7eb; padding: 6px 8px; font-size: 11px; }
+  .section-title { font-size: 11px; font-weight: 800; color: #0D6E6E; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 1px solid rgba(13,110,110,0.25); padding-bottom: 4px; margin-bottom: 8px; }
+  .soap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .soap-item label { font-size: 9px; font-weight: 700; color: #777; text-transform: uppercase; }
+  .soap-item p { margin-top: 3px; font-size: 11px; line-height: 1.5; }
+  table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 10px; }
+  thead tr { background: #0D6E6E; color: white; }
+  th { padding: 7px 8px; text-align: left; font-weight: 600; }
+  td { padding: 6px 8px; border-bottom: 1px solid #e5e7eb; }
   tr:nth-child(even) { background: #f9fafb; }
-  .rx-symbol { font-size: 16px; font-weight: 700; color: #2563eb; margin-right: 4px; }
-  .vitals-row { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 4px; }
-  .vital-chip { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px; padding: 3px 8px; font-size: 10px; }
-  .follow-up { background: #fef3c7; padding: 8px 12px; border-radius: 6px; font-size: 11px; margin-top: 10px; }
-  .footer { margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 12px; display: flex; justify-content: space-between; font-size: 10px; color: #999; }
-  .signature { text-align: right; margin-top: 20px; }
-  .signature-line { border-top: 1px solid #333; width: 200px; margin-left: auto; margin-top: 30px; padding-top: 4px; font-size: 11px; }
+  .followup { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 4px; padding: 8px 12px; font-size: 11px; margin-top: 10px; }
+  .signature { margin-top: 30px; text-align: right; }
+  .sig-line { border-top: 1px solid #333; width: 180px; margin-left: auto; padding-top: 4px; font-size: 10px; }
+  .footer { margin-top: 20px; border-top: 1px solid #e5e7eb; padding-top: 8px; display: flex; justify-content: space-between; font-size: 9px; color: #aaa; }
 </style></head><body>
   <div class="header">
     <div>
       <div class="clinic-name">${clinic?.name || "Clinic"}</div>
-      ${clinic?.address ? `<div class="clinic-info">${clinic.address}</div>` : ""}
-      ${clinic?.phone ? `<div class="clinic-info">Tel: ${clinic.phone}</div>` : ""}
+      <div class="clinic-sub">${clinic?.address || ""}${clinic?.phone ? "<br>Tel: " + clinic.phone : ""}</div>
     </div>
-    <div class="doctor-info">
+    <div class="doctor-block">
       <div class="doctor-name">${doctor?.name || "Doctor"}</div>
-      ${doctor?.qualification ? `<div class="doctor-detail">${doctor.qualification}</div>` : ""}
-      ${doctor?.registration_number ? `<div class="doctor-detail">Reg: ${doctor.registration_number}</div>` : ""}
-      ${doctor?.specialty ? `<div class="doctor-detail">${doctor.specialty}</div>` : ""}
+      <div class="doctor-sub">
+        ${doctor?.qualification || ""}${doctor?.registration_number ? "<br>Reg: " + doctor.registration_number : ""}${doctor?.specialty ? "<br>" + doctor.specialty : ""}
+      </div>
     </div>
   </div>
 
   <div class="patient-bar">
-    <span><strong>Patient:</strong> ${patient?.name || "—"}</span>
-    <span><strong>ID:</strong> ${patient?.healthcare_id || "—"}</span>
-    <span><strong>Age/Gender:</strong> ${getAge(patient?.dob)}y / ${patient?.gender || "—"}</span>
-    <span><strong>Date:</strong> ${new Date().toLocaleDateString("en-IN")}</span>
+    <div class="field"><label>Patient</label><p>${patient?.name || "—"}</p></div>
+    <div class="field"><label>Healthcare ID</label><p>${patient?.healthcare_id || "—"}</p></div>
+    <div class="field"><label>Age / Gender</label><p>${getAge(patient?.dob)}y / ${patient?.gender || "—"}</p></div>
+    <div class="field"><label>Date</label><p>${new Date().toLocaleDateString("en-IN")}</p></div>
   </div>
 
   ${Object.keys(vitals).length > 0 ? `
   <div class="section">
     <div class="section-title">Vitals</div>
-    <div class="vitals-row">
-      ${vitals.bp ? `<div class="vital-chip">BP: ${vitals.bp.systolic}/${vitals.bp.diastolic} mmHg</div>` : ""}
-      ${vitals.pulse ? `<div class="vital-chip">Pulse: ${vitals.pulse} bpm</div>` : ""}
-      ${vitals.temperature ? `<div class="vital-chip">Temp: ${vitals.temperature}°F</div>` : ""}
-      ${vitals.spo2 ? `<div class="vital-chip">SpO2: ${vitals.spo2}%</div>` : ""}
-      ${vitals.weight ? `<div class="vital-chip">Weight: ${vitals.weight} kg</div>` : ""}
+    <div class="vitals-bar">
+      ${vitals.bp ? `<div class="vital"><span>BP</span> ${vitals.bp.systolic || vitals.bp_sys || ""}/${vitals.bp.diastolic || vitals.bp_dia || ""} mmHg</div>` : ""}
+      ${vitals.pulse ? `<div class="vital"><span>Pulse</span> ${vitals.pulse} bpm</div>` : ""}
+      ${vitals.temperature ? `<div class="vital"><span>Temp</span> ${vitals.temperature}°F</div>` : ""}
+      ${vitals.spo2 ? `<div class="vital"><span>SpO2</span> ${vitals.spo2}%</div>` : ""}
+      ${vitals.weight ? `<div class="vital"><span>Weight</span> ${vitals.weight} kg</div>` : ""}
     </div>
   </div>` : ""}
 
   <div class="section">
-    <div class="section-title">Clinical Notes</div>
+    <div class="section-title">Clinical Notes (SOAP)</div>
     <div class="soap-grid">
       <div class="soap-item"><label>Subjective</label><p>${(soap as any).subjective || "—"}</p></div>
       <div class="soap-item"><label>Objective</label><p>${(soap as any).objective || "—"}</p></div>
@@ -146,7 +119,7 @@ serve(async (req) => {
 
   ${meds.length > 0 ? `
   <div class="section">
-    <div class="section-title"><span class="rx-symbol">℞</span> Medications</div>
+    <div class="section-title">℞ Prescription</div>
     <table>
       <thead><tr><th>#</th><th>Drug</th><th>Dosage</th><th>Frequency</th><th>Duration</th><th>Instructions</th></tr></thead>
       <tbody>
@@ -157,13 +130,13 @@ serve(async (req) => {
 
   ${investigations.length > 0 ? `
   <div class="section">
-    <div class="section-title">Investigations Advised</div>
+    <div class="section-title">Investigations</div>
     <p>${investigations.join(", ")}</p>
   </div>` : ""}
 
   ${prescription.follow_up_date ? `
-  <div class="follow-up">
-    <strong>Follow-up:</strong> ${new Date(prescription.follow_up_date).toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+  <div class="followup">
+    📅 <strong>Follow-up:</strong> ${new Date(prescription.follow_up_date).toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
   </div>` : ""}
 
   ${prescription.notes ? `
@@ -173,7 +146,7 @@ serve(async (req) => {
   </div>` : ""}
 
   <div class="signature">
-    <div class="signature-line">${doctor?.name || "Doctor"}</div>
+    <div class="sig-line">${doctor?.name || "Doctor"}<br>${doctor?.qualification || ""}<br>${doctor?.registration_number ? "Reg: " + doctor.registration_number : ""}</div>
   </div>
 
   <div class="footer">
@@ -182,31 +155,18 @@ serve(async (req) => {
   </div>
 </body></html>`;
 
-    // Store HTML as a text file (browser can render/print as PDF)
     const now = new Date();
     const path = `${visit.clinic_id}/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${prescription_id}.html`;
 
-    const htmlBlob = new Blob([html], { type: "text/html" });
-    const arrayBuf = await htmlBlob.arrayBuffer();
-    const uint8 = new Uint8Array(arrayBuf);
+    const bytes = new TextEncoder().encode(html);
+    const { error: uploadErr } = await supabaseAdmin.storage.from("prescriptions").upload(path, bytes, {
+      contentType: "text/html",
+      upsert: true,
+    });
 
-    const { error: uploadErr } = await supabaseAdmin.storage
-      .from("prescriptions")
-      .upload(path, uint8, {
-        contentType: "text/html",
-        upsert: true,
-      });
+    if (uploadErr) throw new Error(`Failed to upload: ${uploadErr.message}`);
 
-    if (uploadErr) {
-      console.error("Upload error:", uploadErr);
-      throw new Error(`Failed to upload prescription: ${uploadErr.message}`);
-    }
-
-    // Update prescription with the path
-    await supabaseAdmin
-      .from("prescriptions")
-      .update({ pdf_url: path })
-      .eq("id", prescription_id);
+    await supabaseAdmin.from("prescriptions").update({ pdf_url: path }).eq("id", prescription_id);
 
     return new Response(
       JSON.stringify({ success: true, path }),
