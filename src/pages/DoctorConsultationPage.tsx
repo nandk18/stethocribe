@@ -19,6 +19,7 @@ type Visit = {
   patient: {
     id: string; name: string; healthcare_id: string | null; gender: string | null;
     dob: string | null; blood_group: string | null; allergies: any; chronic_conditions: any;
+    phone: string | null; email: string | null;
   } | null;
 };
 
@@ -33,7 +34,7 @@ export default function DoctorConsultationPage() {
     if (!visitId || !profile?.clinic_id) return;
     const { data, error } = await supabase
       .from("visits")
-      .select("id, token_number, status, chief_complaint, vitals, created_at, patient_id, patients!inner(id, name, healthcare_id, gender, dob, blood_group, allergies, chronic_conditions)")
+      .select("id, token_number, status, chief_complaint, vitals, created_at, patient_id, patients!inner(id, name, healthcare_id, gender, dob, blood_group, allergies, chronic_conditions, phone, email)")
       .eq("id", visitId)
       .eq("clinic_id", profile.clinic_id)
       .single();

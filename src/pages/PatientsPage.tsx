@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -25,6 +26,7 @@ type Patient = {
 
 export default function PatientsPage() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -84,7 +86,7 @@ export default function PatientsPage() {
       ) : (
         <div className="space-y-2">
           {patients.map(p => (
-            <Card key={p.id} className="shadow-card hover:shadow-elevated transition-shadow">
+            <Card key={p.id} className="shadow-card hover:shadow-elevated transition-shadow cursor-pointer" onClick={() => navigate(`/dashboard/patients/${p.id}`)}>
               <CardContent className="flex flex-col sm:flex-row sm:items-center gap-3 p-4">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 font-display text-sm font-bold text-primary">
