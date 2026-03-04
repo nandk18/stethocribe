@@ -64,7 +64,7 @@ export default function PrescriptionShareModal({ open, onClose, prescriptionPdfU
     if (!signedUrl) return;
     const a = document.createElement("a");
     a.href = signedUrl;
-    a.download = `prescription-${patient?.name}-${new Date().toLocaleDateString("en-IN")}.html`;
+    a.download = `prescription-${patient?.name}-${new Date().toLocaleDateString("en-IN").replace(/\//g, "-")}.pdf`;
     a.target = "_blank";
     a.click();
   };
