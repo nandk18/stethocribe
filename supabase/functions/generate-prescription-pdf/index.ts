@@ -195,7 +195,7 @@ serve(async (req) => {
 
     // ── MEDICATIONS ─────────────────────────────────────
     if (meds.length > 0) {
-      drawText("℞  PRESCRIPTION", left, y, 10, fontBold, teal)
+      drawText("Rx  PRESCRIPTION", left, y, 10, fontBold, teal)
       y -= 4
       drawLine(y, teal, 1)
       y -= 6
