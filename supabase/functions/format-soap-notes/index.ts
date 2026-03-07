@@ -16,7 +16,11 @@ serve(async (req) => {
       throw new Error("ANTHROPIC_API_KEY not configured");
     }
 
-    const { transcript, patient_context } = await req.json();
+    const { transcript, patient_context, template_name, template_sections } = await req.json();
+
+    const templateInstruction = template_name && template_sections
+      ? `Format the output according to the "${template_name}" template with these sections: ${template_sections.join(", ")}.`
+      : "Use standard SOAP format.";
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -33,6 +37,7 @@ Convert the doctor's dictation into structured clinical documentation.
 The dictation may be in English or any Indian regional language (Hindi, Tamil,
 Telugu, Kannada, Malayalam, Marathi, Bengali, Gujarati, Punjabi).
 Always write the output in English regardless of input language.
+${templateInstruction}
 
 Return ONLY a valid JSON object with no extra text, no markdown, no code blocks:
 {
@@ -44,9 +49,12 @@ Return ONLY a valid JSON object with no extra text, no markdown, no code blocks:
     {
       "name": "drug name",
       "dosage": "500mg",
-      "frequency": "TDS",
+      "morning": true,
+      "afternoon": false,
+      "evening": true,
+      "night": true,
       "duration": "5 days",
-      "instructions": "after food"
+      "notes": "after food"
     }
   ],
   "investigations": ["CBC", "Blood Sugar Fasting"],
