@@ -9,11 +9,15 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Mic, FileText, Pill, CheckCircle, AlertTriangle, Activity, History, ClipboardList } from "lucide-react";
+import { Mic, FileText, Pill, CheckCircle, AlertTriangle, Activity, History, ClipboardList, FolderOpen } from "lucide-react";
 import VoiceRecorder from "@/components/doctor/VoiceRecorder";
 import PatientHistory from "@/components/doctor/PatientHistory";
 import PrescriptionShareModal from "@/components/doctor/PrescriptionShareModal";
+import DocumentsTab from "@/components/doctor/DocumentsTab";
+import TemplateSelector from "@/components/doctor/TemplateSelector";
+import EMRExportButtons from "@/components/doctor/EMRExportButtons";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 type Visit = {
@@ -30,7 +34,10 @@ type Visit = {
   } | null;
 };
 
-type Medication = { name: string; dosage: string; frequency: string; duration: string; instructions: string };
+type Medication = {
+  name: string; dosage: string; morning: boolean; afternoon: boolean;
+  evening: boolean; night: boolean; duration: string; notes: string;
+};
 
 export default function ConsultationWorkspace({ visit, onComplete }: { visit: Visit; onComplete: () => void }) {
   const { profile } = useAuth();
@@ -44,9 +51,12 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
   const [assessment, setAssessment] = useState("");
   const [plan, setPlan] = useState("");
 
+  // Template
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+
   // Prescription
   const [medications, setMedications] = useState<Medication[]>([
-    { name: "", dosage: "", frequency: "", duration: "", instructions: "" },
+    { name: "", dosage: "", morning: false, afternoon: false, evening: false, night: false, duration: "", notes: "" },
   ]);
   const [investigations, setInvestigations] = useState("");
   const [followUpDate, setFollowUpDate] = useState("");
@@ -69,15 +79,26 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
     if (soapData.objective) setObjective(soapData.objective);
     if (soapData.assessment) setAssessment(soapData.assessment);
     if (soapData.plan) setPlan(soapData.plan);
-    if (soapData.medications?.length) setMedications(soapData.medications);
+    if (soapData.medications?.length) {
+      setMedications(soapData.medications.map((m: any) => ({
+        name: m.name || "",
+        dosage: m.dosage || "",
+        morning: !!m.morning,
+        afternoon: !!m.afternoon,
+        evening: !!m.evening,
+        night: !!m.night,
+        duration: m.duration || "",
+        notes: m.notes || m.instructions || "",
+      })));
+    }
     if (soapData.investigations?.length) setInvestigations(soapData.investigations.join(", "));
     setTab("soap");
     toast.success("SOAP notes generated from transcript!");
   };
 
-  const addMedRow = () => setMedications(prev => [...prev, { name: "", dosage: "", frequency: "", duration: "", instructions: "" }]);
+  const addMedRow = () => setMedications(prev => [...prev, { name: "", dosage: "", morning: false, afternoon: false, evening: false, night: false, duration: "", notes: "" }]);
   const removeMedRow = (idx: number) => setMedications(prev => prev.filter((_, i) => i !== idx));
-  const updateMed = (idx: number, field: keyof Medication, value: string) => {
+  const updateMed = (idx: number, field: keyof Medication, value: any) => {
     setMedications(prev => prev.map((m, i) => i === idx ? { ...m, [field]: value } : m));
   };
 
@@ -113,6 +134,11 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
 
       await supabase.from("visits").update({ status: "completed", doctor_id: doctorRow.id }).eq("id", visit.id);
 
+      // Save default template for doctor
+      if (selectedTemplate?.id) {
+        await supabase.from("doctors").update({ default_template_id: selectedTemplate.id } as any).eq("id", doctorRow.id);
+      }
+
       // Trigger PDF generation and show share modal
       if (prescriptionId) {
         const { data: pdfResult, error: pdfError } = await supabase.functions.invoke("generate-prescription-pdf", {
@@ -138,21 +164,22 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
   };
 
   const mobileTabItems = [
-    { value: "summary", icon: ClipboardList, label: "Summary" },
-    { value: "history", icon: History, label: "History" },
-    { value: "record", icon: Mic, label: "Voice" },
-    { value: "soap", icon: FileText, label: "SOAP" },
-    { value: "prescription", icon: Pill, label: "Rx" },
+    { value: "summary", label: "Sum" },
+    { value: "history", label: "Hist" },
+    { value: "record", label: "Rec" },
+    { value: "soap", label: "SOAP" },
+    { value: "prescription", label: "Rx" },
+    { value: "documents", label: "Docs" },
   ];
 
   return (
     <div className="space-y-4 animate-fade-in">
       {/* Patient Header */}
-      <Card className="shadow-card">
+      <Card className="rounded-2xl border-0 shadow-sm">
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 font-display text-lg font-bold text-primary">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 font-display text-lg font-bold text-primary">
                 #{visit.token_number}
               </div>
               <div>
@@ -167,7 +194,7 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
                   </span>
                 </div>
                 {visit.chief_complaint && (
-                  <p className="text-sm font-medium text-foreground mt-1 bg-warning/10 text-warning px-2 py-0.5 rounded inline-block">
+                  <p className="text-sm font-medium text-foreground mt-1 bg-warning/10 text-warning px-2 py-0.5 rounded-lg inline-block">
                     {visit.chief_complaint}
                   </p>
                 )}
@@ -176,14 +203,14 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
             <div className="flex items-center gap-2 flex-wrap">
               {visit.patient?.allergies && Array.isArray(visit.patient.allergies) && visit.patient.allergies.length > 0 && (
                 (visit.patient.allergies as string[]).map((a: string) => (
-                  <Badge key={a} variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive">
+                  <Badge key={a} variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive rounded-lg">
                     <AlertTriangle className="mr-1 h-3 w-3" /> {a}
                   </Badge>
                 ))
               )}
               {visit.patient?.chronic_conditions && Array.isArray(visit.patient.chronic_conditions) && visit.patient.chronic_conditions.length > 0 && (
                 (visit.patient.chronic_conditions as string[]).map((c: string) => (
-                  <Badge key={c} variant="outline" className="border-warning/30 bg-warning/10 text-warning">
+                  <Badge key={c} variant="outline" className="border-warning/30 bg-warning/10 text-warning rounded-lg">
                     {c}
                   </Badge>
                 ))
@@ -194,43 +221,37 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
           {Object.keys(vitals).length > 0 && (
             <div className="mt-3 flex flex-wrap gap-3">
               {vitals.bp && (
-                <div className="flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-xs">
+                <div className="flex items-center gap-1.5 rounded-lg bg-muted px-3 py-1.5 text-xs">
                   <Activity className="h-3 w-3 text-primary" />
                   <span className="font-medium">BP:</span> {vitals.bp.systolic}/{vitals.bp.diastolic}
                 </div>
               )}
-              {vitals.pulse && <div className="rounded-md bg-muted px-3 py-1.5 text-xs"><span className="font-medium">Pulse:</span> {vitals.pulse}</div>}
-              {vitals.temperature && <div className="rounded-md bg-muted px-3 py-1.5 text-xs"><span className="font-medium">Temp:</span> {vitals.temperature}°F</div>}
-              {vitals.spo2 && <div className="rounded-md bg-muted px-3 py-1.5 text-xs"><span className="font-medium">SpO2:</span> {vitals.spo2}%</div>}
-              {vitals.weight && <div className="rounded-md bg-muted px-3 py-1.5 text-xs"><span className="font-medium">Wt:</span> {vitals.weight}kg</div>}
+              {vitals.pulse && <div className="rounded-lg bg-muted px-3 py-1.5 text-xs"><span className="font-medium">Pulse:</span> {vitals.pulse}</div>}
+              {vitals.temperature && <div className="rounded-lg bg-muted px-3 py-1.5 text-xs"><span className="font-medium">Temp:</span> {vitals.temperature}°F</div>}
+              {vitals.spo2 && <div className="rounded-lg bg-muted px-3 py-1.5 text-xs"><span className="font-medium">SpO2:</span> {vitals.spo2}%</div>}
+              {vitals.weight && <div className="rounded-lg bg-muted px-3 py-1.5 text-xs"><span className="font-medium">Wt:</span> {vitals.weight}kg</div>}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Mobile: 2x3 grid tabs */}
+      {/* Mobile: pill row tabs */}
       {isMobile ? (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="flex gap-1">
             {mobileTabItems.map(item => (
-              <Button
+              <button
                 key={item.value}
-                variant={tab === item.value ? "default" : "outline"}
-                className={`h-14 flex-col gap-1 text-xs ${tab === item.value ? "" : ""}`}
+                className={`flex-1 py-2 text-xs font-medium rounded-full transition-all ${
+                  tab === item.value
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
                 onClick={() => setTab(item.value)}
               >
-                <item.icon className="h-5 w-5" />
                 {item.label}
-              </Button>
+              </button>
             ))}
-            <Button
-              className="h-14 flex-col gap-1 text-xs bg-primary hover:bg-primary/90"
-              onClick={handleCompleteConsultation}
-              disabled={saving}
-            >
-              <CheckCircle className="h-5 w-5" />
-              {saving ? "Saving..." : "Complete"}
-            </Button>
           </div>
 
           {/* Content */}
@@ -239,16 +260,29 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
           {tab === "record" && <VoiceRecorder visitId={visit.id} onTranscriptProcessed={handleTranscriptProcessed} />}
           {tab === "soap" && renderSoap()}
           {tab === "prescription" && renderPrescription()}
+          {tab === "documents" && visit.patient && profile?.clinic_id && (
+            <DocumentsTab visitId={visit.id} patientId={visit.patient.id} clinicId={profile.clinic_id} />
+          )}
+
+          <Button
+            className="w-full h-12 rounded-xl font-medium"
+            onClick={handleCompleteConsultation}
+            disabled={saving}
+          >
+            <CheckCircle className="mr-2 h-5 w-5" />
+            {saving ? "Saving..." : "Complete Consultation"}
+          </Button>
         </div>
       ) : (
         /* Desktop: standard tabs */
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
-            <TabsTrigger value="summary">Summary</TabsTrigger>
-            <TabsTrigger value="history"><History className="mr-1.5 h-3.5 w-3.5" /> History</TabsTrigger>
-            <TabsTrigger value="record"><Mic className="mr-1.5 h-3.5 w-3.5" /> Voice Record</TabsTrigger>
-            <TabsTrigger value="soap"><FileText className="mr-1.5 h-3.5 w-3.5" /> SOAP Notes</TabsTrigger>
-            <TabsTrigger value="prescription"><Pill className="mr-1.5 h-3.5 w-3.5" /> Prescription</TabsTrigger>
+          <TabsList className="rounded-xl">
+            <TabsTrigger value="summary" className="rounded-lg">Summary</TabsTrigger>
+            <TabsTrigger value="history" className="rounded-lg"><History className="mr-1.5 h-3.5 w-3.5" /> History</TabsTrigger>
+            <TabsTrigger value="record" className="rounded-lg"><Mic className="mr-1.5 h-3.5 w-3.5" /> Voice</TabsTrigger>
+            <TabsTrigger value="soap" className="rounded-lg"><FileText className="mr-1.5 h-3.5 w-3.5" /> SOAP</TabsTrigger>
+            <TabsTrigger value="prescription" className="rounded-lg"><Pill className="mr-1.5 h-3.5 w-3.5" /> Rx</TabsTrigger>
+            <TabsTrigger value="documents" className="rounded-lg"><FolderOpen className="mr-1.5 h-3.5 w-3.5" /> Docs</TabsTrigger>
           </TabsList>
 
           <TabsContent value="summary">{renderSummary()}</TabsContent>
@@ -260,20 +294,25 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
           </TabsContent>
           <TabsContent value="soap">{renderSoap()}</TabsContent>
           <TabsContent value="prescription">{renderPrescription()}</TabsContent>
+          <TabsContent value="documents">
+            {visit.patient && profile?.clinic_id && (
+              <DocumentsTab visitId={visit.id} patientId={visit.patient.id} clinicId={profile.clinic_id} />
+            )}
+          </TabsContent>
         </Tabs>
       )}
 
       {/* Desktop: Complete button */}
       {!isMobile && (
         <div className="flex justify-end">
-          <Button size="lg" onClick={handleCompleteConsultation} disabled={saving}>
+          <Button size="lg" className="rounded-xl font-medium" onClick={handleCompleteConsultation} disabled={saving}>
             <CheckCircle className="mr-2 h-4 w-4" />
             {saving ? "Saving..." : "Complete Consultation"}
           </Button>
         </div>
       )}
 
-      {/* Sharing modal */}
+      {/* Sharing modal with EMR export */}
       <PrescriptionShareModal
         open={shareOpen}
         onClose={() => { setShareOpen(false); onComplete(); }}
@@ -286,13 +325,22 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
         } : null}
         clinicName={clinic?.name || "Clinic"}
         doctorName={doctor?.name || "Doctor"}
+        emrExportProps={visit.patient ? {
+          patient: { name: visit.patient.name, healthcare_id: visit.patient.healthcare_id, dob: visit.patient.dob, gender: visit.patient.gender, phone: visit.patient.phone },
+          visit: { id: visit.id, chief_complaint: visit.chief_complaint },
+          doctor: { name: doctor?.name || "", registration_number: doctor?.registration_number || "" },
+          soap: { subjective, objective, assessment, plan },
+          medications,
+          investigations: investigations ? investigations.split(",").map(s => s.trim()) : [],
+          followUpDate,
+        } : undefined}
       />
     </div>
   );
 
   function renderSummary() {
     return (
-      <Card className="shadow-card">
+      <Card className="rounded-2xl border-0 shadow-sm">
         <CardContent className="p-6">
           <h3 className="font-display font-semibold mb-3">Patient Summary</h3>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -315,12 +363,19 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
 
   function renderSoap() {
     return (
-      <Card className="shadow-card">
+      <Card className="rounded-2xl border-0 shadow-sm">
         <CardContent className="space-y-4 p-6">
-          <div className="space-y-2"><Label className="font-semibold">Subjective</Label><Textarea rows={3} value={subjective} onChange={e => setSubjective(e.target.value)} placeholder="Patient's symptoms and history..." /></div>
-          <div className="space-y-2"><Label className="font-semibold">Objective</Label><Textarea rows={3} value={objective} onChange={e => setObjective(e.target.value)} placeholder="Physical exam findings, vitals..." /></div>
-          <div className="space-y-2"><Label className="font-semibold">Assessment</Label><Textarea rows={3} value={assessment} onChange={e => setAssessment(e.target.value)} placeholder="Diagnosis and clinical reasoning..." /></div>
-          <div className="space-y-2"><Label className="font-semibold">Plan</Label><Textarea rows={3} value={plan} onChange={e => setPlan(e.target.value)} placeholder="Treatment plan, follow-up..." /></div>
+          {profile?.clinic_id && (
+            <TemplateSelector
+              clinicId={profile.clinic_id}
+              doctorDefaultTemplateId={(doctor as any)?.default_template_id || null}
+              onTemplateChange={setSelectedTemplate}
+            />
+          )}
+          <div className="space-y-2"><Label className="font-semibold">Subjective</Label><Textarea rows={3} value={subjective} onChange={e => setSubjective(e.target.value)} placeholder="Patient's symptoms and history..." className="rounded-lg" /></div>
+          <div className="space-y-2"><Label className="font-semibold">Objective</Label><Textarea rows={3} value={objective} onChange={e => setObjective(e.target.value)} placeholder="Physical exam findings, vitals..." className="rounded-lg" /></div>
+          <div className="space-y-2"><Label className="font-semibold">Assessment</Label><Textarea rows={3} value={assessment} onChange={e => setAssessment(e.target.value)} placeholder="Diagnosis and clinical reasoning..." className="rounded-lg" /></div>
+          <div className="space-y-2"><Label className="font-semibold">Plan</Label><Textarea rows={3} value={plan} onChange={e => setPlan(e.target.value)} placeholder="Treatment plan, follow-up..." className="rounded-lg" /></div>
         </CardContent>
       </Card>
     );
@@ -328,28 +383,43 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
 
   function renderPrescription() {
     return (
-      <Card className="shadow-card">
+      <Card className="rounded-2xl border-0 shadow-sm">
         <CardContent className="space-y-4 p-6">
           <div>
-            <Label className="font-semibold mb-3 block">Medications (℞)</Label>
+            <Label className="font-semibold mb-3 block">Medications (Rx)</Label>
             <div className="space-y-3">
               {medications.map((med, i) => (
-                <div key={i} className="grid grid-cols-2 sm:grid-cols-6 gap-2 items-end">
-                  <div className="col-span-2"><Input placeholder="Drug name" value={med.name} onChange={e => updateMed(i, "name", e.target.value)} /></div>
-                  <Input placeholder="Dosage" value={med.dosage} onChange={e => updateMed(i, "dosage", e.target.value)} />
-                  <Input placeholder="Frequency" value={med.frequency} onChange={e => updateMed(i, "frequency", e.target.value)} />
-                  <Input placeholder="Duration" value={med.duration} onChange={e => updateMed(i, "duration", e.target.value)} />
-                  <Button variant="ghost" size="sm" onClick={() => removeMedRow(i)} className="text-destructive">✕</Button>
+                <div key={i} className="rounded-xl bg-muted/30 p-3 space-y-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <Input placeholder="Drug name" value={med.name} onChange={e => updateMed(i, "name", e.target.value)} className="col-span-2 sm:col-span-1 rounded-lg" />
+                    <Input placeholder="Dosage" value={med.dosage} onChange={e => updateMed(i, "dosage", e.target.value)} className="rounded-lg" />
+                    <Input placeholder="Duration" value={med.duration} onChange={e => updateMed(i, "duration", e.target.value)} className="rounded-lg" />
+                  </div>
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <span className="text-xs font-medium text-muted-foreground">Timing:</span>
+                    {(["morning", "afternoon", "evening", "night"] as const).map(time => (
+                      <label key={time} className="flex items-center gap-1.5 text-xs cursor-pointer">
+                        <Checkbox
+                          checked={med[time]}
+                          onCheckedChange={(v) => updateMed(i, time, !!v)}
+                          className="h-4 w-4"
+                        />
+                        <span className="capitalize">{time.charAt(0).toUpperCase()}</span>
+                      </label>
+                    ))}
+                    <Input placeholder="Notes" value={med.notes} onChange={e => updateMed(i, "notes", e.target.value)} className="flex-1 min-w-[120px] rounded-lg text-xs h-8" />
+                    <Button variant="ghost" size="sm" onClick={() => removeMedRow(i)} className="text-destructive h-8 w-8 p-0">✕</Button>
+                  </div>
                 </div>
               ))}
             </div>
-            <Button variant="outline" size="sm" onClick={addMedRow} className="mt-2">+ Add Medication</Button>
+            <Button variant="outline" size="sm" onClick={addMedRow} className="mt-2 rounded-lg">+ Add Medication</Button>
           </div>
 
-          <div className="space-y-2"><Label className="font-semibold">Investigations</Label><Input value={investigations} onChange={e => setInvestigations(e.target.value)} placeholder="CBC, LFT, ECG..." /></div>
+          <div className="space-y-2"><Label className="font-semibold">Investigations</Label><Input value={investigations} onChange={e => setInvestigations(e.target.value)} placeholder="CBC, LFT, ECG..." className="rounded-lg" /></div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2"><Label className="font-semibold">Follow-up Date</Label><Input type="date" value={followUpDate} onChange={e => setFollowUpDate(e.target.value)} /></div>
-            <div className="space-y-2"><Label className="font-semibold">Notes</Label><Input value={prescriptionNotes} onChange={e => setPrescriptionNotes(e.target.value)} placeholder="Additional notes..." /></div>
+            <div className="space-y-2"><Label className="font-semibold">Follow-up Date</Label><Input type="date" value={followUpDate} onChange={e => setFollowUpDate(e.target.value)} className="rounded-lg" /></div>
+            <div className="space-y-2"><Label className="font-semibold">Notes</Label><Input value={prescriptionNotes} onChange={e => setPrescriptionNotes(e.target.value)} placeholder="Additional notes..." className="rounded-lg" /></div>
           </div>
         </CardContent>
       </Card>

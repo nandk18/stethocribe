@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { CheckCircle, MessageCircle, Mail, Copy, Download, Printer, Loader2 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import EMRExportButtons from "@/components/doctor/EMRExportButtons";
 
 type Props = {
   open: boolean;
@@ -14,9 +15,18 @@ type Props = {
   patient: { name: string; phone: string | null; email: string | null; healthcare_id: string | null } | null;
   clinicName: string;
   doctorName: string;
+  emrExportProps?: {
+    patient: any;
+    visit: any;
+    doctor: any;
+    soap: any;
+    medications: any[];
+    investigations: string[];
+    followUpDate?: string | null;
+  };
 };
 
-export default function PrescriptionShareModal({ open, onClose, prescriptionPdfUrl, patient, clinicName, doctorName }: Props) {
+export default function PrescriptionShareModal({ open, onClose, prescriptionPdfUrl, patient, clinicName, doctorName, emrExportProps }: Props) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const isMobile = useIsMobile();
@@ -24,7 +34,7 @@ export default function PrescriptionShareModal({ open, onClose, prescriptionPdfU
   useEffect(() => {
     if (open && prescriptionPdfUrl) {
       setLoading(true);
-      supabase.storage.from("prescriptions").createSignedUrl(prescriptionPdfUrl, 604800) // 7 days
+      supabase.storage.from("prescriptions").createSignedUrl(prescriptionPdfUrl, 604800)
         .then(({ data }) => { setSignedUrl(data?.signedUrl || null); setLoading(false); })
         .catch(() => setLoading(false));
     } else {
@@ -93,27 +103,35 @@ export default function PrescriptionShareModal({ open, onClose, prescriptionPdfU
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline" className="h-12 gap-2" onClick={handleWhatsApp} disabled={!patient?.phone}>
+            <Button variant="outline" className="h-12 gap-2 rounded-xl" onClick={handleWhatsApp} disabled={!patient?.phone}>
               <MessageCircle className="h-4 w-4 text-green-600" /> WhatsApp
             </Button>
-            <Button variant="outline" className="h-12 gap-2" onClick={handleEmail} disabled={!patient?.email}>
+            <Button variant="outline" className="h-12 gap-2 rounded-xl" onClick={handleEmail} disabled={!patient?.email}>
               <Mail className="h-4 w-4 text-blue-600" /> Email
             </Button>
-            <Button variant="outline" className="h-12 gap-2" onClick={handleCopy}>
+            <Button variant="outline" className="h-12 gap-2 rounded-xl" onClick={handleCopy}>
               <Copy className="h-4 w-4" /> Copy Link
             </Button>
-            <Button variant="outline" className="h-12 gap-2" onClick={handleDownload}>
+            <Button variant="outline" className="h-12 gap-2 rounded-xl" onClick={handleDownload}>
               <Download className="h-4 w-4" /> Download
             </Button>
           </div>
-          <Button variant="outline" className="w-full h-12 gap-2" onClick={handlePrint}>
+          <Button variant="outline" className="w-full h-12 gap-2 rounded-xl" onClick={handlePrint}>
             <Printer className="h-4 w-4" /> Print
           </Button>
           <p className="text-xs text-muted-foreground text-center">Link valid for 7 days</p>
         </>
       )}
 
-      <Button className="w-full" onClick={onClose}>Done</Button>
+      {/* EMR Export */}
+      {emrExportProps && (
+        <div className="border-t border-border pt-4">
+          <p className="text-sm font-medium text-foreground mb-2">Export to EMR</p>
+          <EMRExportButtons {...emrExportProps} />
+        </div>
+      )}
+
+      <Button className="w-full rounded-xl" onClick={onClose}>Done</Button>
     </div>
   );
 
