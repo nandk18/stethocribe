@@ -72,6 +72,8 @@ export type Database = {
           name: string
           onboarding_complete: boolean | null
           phone: string | null
+          prescription_template: string | null
+          regional_language: string | null
         }
         Insert: {
           address?: string | null
@@ -82,6 +84,8 @@ export type Database = {
           name: string
           onboarding_complete?: boolean | null
           phone?: string | null
+          prescription_template?: string | null
+          regional_language?: string | null
         }
         Update: {
           address?: string | null
@@ -92,6 +96,8 @@ export type Database = {
           name?: string
           onboarding_complete?: boolean | null
           phone?: string | null
+          prescription_template?: string | null
+          regional_language?: string | null
         }
         Relationships: []
       }
@@ -100,6 +106,7 @@ export type Database = {
           availability: string | null
           clinic_id: string
           created_at: string | null
+          default_template_id: string | null
           id: string
           name: string
           qualification: string | null
@@ -112,6 +119,7 @@ export type Database = {
           availability?: string | null
           clinic_id: string
           created_at?: string | null
+          default_template_id?: string | null
           id?: string
           name: string
           qualification?: string | null
@@ -124,6 +132,7 @@ export type Database = {
           availability?: string | null
           clinic_id?: string
           created_at?: string | null
+          default_template_id?: string | null
           id?: string
           name?: string
           qualification?: string | null
@@ -170,6 +179,105 @@ export type Database = {
             columns: ["prescription_id"]
             isOneToOne: false
             referencedRelation: "prescriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      note_templates: {
+        Row: {
+          clinic_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_system: boolean | null
+          name: string
+          sections: Json
+        }
+        Insert: {
+          clinic_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_system?: boolean | null
+          name: string
+          sections?: Json
+        }
+        Update: {
+          clinic_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_system?: boolean | null
+          name?: string
+          sections?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "note_templates_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      patient_documents: {
+        Row: {
+          clinic_id: string | null
+          created_at: string | null
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          patient_id: string | null
+          uploaded_by: string
+          visit_id: string | null
+        }
+        Insert: {
+          clinic_id?: string | null
+          created_at?: string | null
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          patient_id?: string | null
+          uploaded_by: string
+          visit_id?: string | null
+        }
+        Update: {
+          clinic_id?: string | null
+          created_at?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          patient_id?: string | null
+          uploaded_by?: string
+          visit_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_documents_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_documents_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_documents_visit_id_fkey"
+            columns: ["visit_id"]
+            isOneToOne: false
+            referencedRelation: "visits"
             referencedColumns: ["id"]
           },
         ]
