@@ -10,7 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Building2, User, Save, Loader2, UserPlus, Send, Smartphone, Shield, Users, Trash2 } from "lucide-react";
+import { Building2, User, Save, Loader2, UserPlus, Send, Smartphone, Shield, Users, Trash2, Globe } from "lucide-react";
+
+const LANGUAGES = [
+  "Tamil","Hindi","Telugu","Kannada","Malayalam","Marathi",
+  "Bengali","Gujarati","Punjabi","Odia","Assamese","Urdu",
+  "Konkani","Manipuri","Sindhi"
+];
 
 export default function Settings() {
   const { user, profile } = useAuth();
@@ -20,6 +26,7 @@ export default function Settings() {
   const [clinicName, setClinicName] = useState("");
   const [clinicAddress, setClinicAddress] = useState("");
   const [clinicPhone, setClinicPhone] = useState("");
+  const [regionalLanguage, setRegionalLanguage] = useState("Tamil");
 
   const [doctorName, setDoctorName] = useState("");
   const [qualification, setQualification] = useState("");
@@ -46,6 +53,7 @@ export default function Settings() {
       setClinicName(clinic.name || "");
       setClinicAddress(clinic.address || "");
       setClinicPhone(clinic.phone || "");
+      setRegionalLanguage((clinic as any).regional_language || "Tamil");
     }
   }, [clinic]);
 
@@ -67,28 +75,12 @@ export default function Settings() {
   const fetchTeam = async () => {
     if (!profile?.clinic_id) return;
     setLoadingTeam(true);
-    // Fetch profiles with clinic_id
     const { data: profileData } = await supabase
       .from("profiles")
       .select("user_id, full_name, role, created_at")
       .eq("clinic_id", profile.clinic_id)
       .order("role");
-    
-    // Also fetch doctors to catch any staff whose profile clinic_id might not be set
-    const { data: doctorData } = await supabase
-      .from("doctors")
-      .select("user_id, name, qualification, specialty")
-      .eq("clinic_id", profile.clinic_id);
-    
-    const merged = [...(profileData || [])];
-    const existingIds = new Set(merged.map(m => m.user_id));
-    // Add any doctors not already in profile results
-    (doctorData || []).forEach(d => {
-      if (!existingIds.has(d.user_id)) {
-        merged.push({ user_id: d.user_id, full_name: d.name, role: "doctor" as any, created_at: null });
-      }
-    });
-    setTeam(merged);
+    setTeam(profileData || []);
     setLoadingTeam(false);
   };
 
@@ -97,8 +89,11 @@ export default function Settings() {
     setSaving(true);
     try {
       const { error } = await supabase.from("clinics").update({
-        name: clinicName, address: clinicAddress || null, phone: clinicPhone || null,
-      }).eq("id", profile.clinic_id);
+        name: clinicName,
+        address: clinicAddress || null,
+        phone: clinicPhone || null,
+        regional_language: regionalLanguage,
+      } as any).eq("id", profile.clinic_id);
       if (error) throw error;
       toast.success("Clinic details saved!");
       refetch();
@@ -132,11 +127,12 @@ export default function Settings() {
     if (!inviteEmail.trim() || !profile?.clinic_id) return;
     setInviting(true);
     try {
-      const { error } = await supabase.functions.invoke("invite-staff", {
-        body: { email: inviteEmail, role: inviteRole, clinic_id: profile.clinic_id },
+      const { data, error } = await supabase.functions.invoke("invite-staff", {
+        body: { email: inviteEmail, role: inviteRole },
       });
       if (error) throw error;
-      toast.success(`Invitation sent to ${inviteEmail} as ${inviteRole}`);
+      if (data?.error) throw new Error(data.error);
+      toast.success(data?.message || `Invitation sent to ${inviteEmail} as ${inviteRole}`);
       setInviteEmail("");
       fetchTeam();
     } catch (err: any) {
@@ -156,31 +152,18 @@ export default function Settings() {
       return;
     }
     if (!user?.email) return;
-
     setChangingPassword(true);
     try {
-      // Verify current password
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: currentPassword,
+        email: user.email, password: currentPassword,
       });
-      if (signInError) {
-        toast.error("Current password is incorrect");
-        setChangingPassword(false);
-        return;
-      }
-      // Update password
+      if (signInError) { toast.error("Current password is incorrect"); setChangingPassword(false); return; }
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
       toast.success("Password updated successfully");
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmNewPassword("");
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setChangingPassword(false);
-    }
+      setCurrentPassword(""); setNewPassword(""); setConfirmNewPassword("");
+    } catch (err: any) { toast.error(err.message); }
+    finally { setChangingPassword(false); }
   };
 
   const handleRemoveStaff = async (userId: string, name: string) => {
@@ -189,9 +172,7 @@ export default function Settings() {
       await supabase.from("profiles").update({ clinic_id: null }).eq("user_id", userId);
       toast.success("Staff member removed");
       fetchTeam();
-    } catch (err: any) {
-      toast.error(err.message);
-    }
+    } catch (err: any) { toast.error(err.message); }
   };
 
   if (loading) {
@@ -204,6 +185,10 @@ export default function Settings() {
     );
   }
 
+  const doctors = team.filter(m => m.role === "doctor");
+  const receptionists = team.filter(m => m.role === "receptionist");
+  const admins = team.filter(m => m.role === "admin");
+
   return (
     <DashboardLayout>
       <div className="mb-6">
@@ -213,24 +198,36 @@ export default function Settings() {
 
       <div className="space-y-6 max-w-2xl">
         {/* Clinic Details */}
-        <Card className="shadow-card">
+        <Card className="rounded-2xl border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 font-display">
               <Building2 className="h-5 w-5 text-primary" /> Clinic Details
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2"><Label>Clinic Name</Label><Input value={clinicName} onChange={e => setClinicName(e.target.value)} /></div>
-            <div className="space-y-2"><Label>Address</Label><Input value={clinicAddress} onChange={e => setClinicAddress(e.target.value)} /></div>
-            <div className="space-y-2"><Label>Phone</Label><Input value={clinicPhone} onChange={e => setClinicPhone(e.target.value)} /></div>
-            <Button onClick={handleSaveClinic} disabled={saving}>
+            <div className="space-y-2"><Label>Clinic Name</Label><Input value={clinicName} onChange={e => setClinicName(e.target.value)} className="rounded-lg" /></div>
+            <div className="space-y-2"><Label>Address</Label><Input value={clinicAddress} onChange={e => setClinicAddress(e.target.value)} className="rounded-lg" /></div>
+            <div className="space-y-2"><Label>Phone</Label><Input value={clinicPhone} onChange={e => setClinicPhone(e.target.value)} className="rounded-lg" /></div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2"><Globe className="h-4 w-4 text-primary" /> Regional Language</Label>
+              <Select value={regionalLanguage} onValueChange={setRegionalLanguage}>
+                <SelectTrigger className="rounded-lg"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {LANGUAGES.map(lang => (
+                    <SelectItem key={lang} value={lang}>{lang}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Used for bilingual prescription headers</p>
+            </div>
+            <Button onClick={handleSaveClinic} disabled={saving} className="rounded-lg">
               <Save className="mr-2 h-4 w-4" /> Save Clinic Details
             </Button>
           </CardContent>
         </Card>
 
         {/* Doctor Profile */}
-        <Card className="shadow-card">
+        <Card className="rounded-2xl border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 font-display">
               <User className="h-5 w-5 text-primary" /> Doctor Profile
@@ -238,32 +235,32 @@ export default function Settings() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2"><Label>Doctor Name</Label><Input value={doctorName} onChange={e => setDoctorName(e.target.value)} placeholder="Dr. Name" /></div>
+            <div className="space-y-2"><Label>Doctor Name</Label><Input value={doctorName} onChange={e => setDoctorName(e.target.value)} placeholder="Dr. Name" className="rounded-lg" /></div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Qualification</Label><Input value={qualification} onChange={e => setQualification(e.target.value)} placeholder="MBBS, MD" /></div>
-              <div className="space-y-2"><Label>Specialty</Label><Input value={specialty} onChange={e => setSpecialty(e.target.value)} placeholder="General Medicine" /></div>
+              <div className="space-y-2"><Label>Qualification</Label><Input value={qualification} onChange={e => setQualification(e.target.value)} placeholder="MBBS, MD" className="rounded-lg" /></div>
+              <div className="space-y-2"><Label>Specialty</Label><Input value={specialty} onChange={e => setSpecialty(e.target.value)} placeholder="General Medicine" className="rounded-lg" /></div>
             </div>
-            <div className="space-y-2"><Label>Registration Number</Label><Input value={regNumber} onChange={e => setRegNumber(e.target.value)} placeholder="MCI-123456" /></div>
-            <Button onClick={handleSaveDoctor} disabled={saving}>
+            <div className="space-y-2"><Label>Registration Number</Label><Input value={regNumber} onChange={e => setRegNumber(e.target.value)} placeholder="MCI-123456" className="rounded-lg" /></div>
+            <Button onClick={handleSaveDoctor} disabled={saving} className="rounded-lg">
               <Save className="mr-2 h-4 w-4" /> {doctor ? "Update" : "Create"} Doctor Profile
             </Button>
           </CardContent>
         </Card>
 
-        {/* Security - Change Password */}
-        <Card className="shadow-card">
+        {/* Security */}
+        <Card className="rounded-2xl border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 font-display">
               <Shield className="h-5 w-5 text-primary" /> Security
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2"><Label>Current Password</Label><Input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="••••••••" /></div>
+            <div className="space-y-2"><Label>Current Password</Label><Input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="••••••••" className="rounded-lg" /></div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>New Password</Label><Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Min 8 characters" minLength={8} /></div>
-              <div className="space-y-2"><Label>Confirm New Password</Label><Input type="password" value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} placeholder="Re-enter" minLength={8} /></div>
+              <div className="space-y-2"><Label>New Password</Label><Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Min 8 characters" className="rounded-lg" /></div>
+              <div className="space-y-2"><Label>Confirm New Password</Label><Input type="password" value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} placeholder="Re-enter" className="rounded-lg" /></div>
             </div>
-            <Button onClick={handleChangePassword} disabled={changingPassword || !currentPassword || !newPassword}>
+            <Button onClick={handleChangePassword} disabled={changingPassword || !currentPassword || !newPassword} className="rounded-lg">
               <Shield className="mr-2 h-4 w-4" /> {changingPassword ? "Updating..." : "Update Password"}
             </Button>
           </CardContent>
@@ -271,7 +268,7 @@ export default function Settings() {
 
         {/* Invite Staff (Admin only) */}
         {profile?.role === "admin" && (
-          <Card className="shadow-card">
+          <Card className="rounded-2xl border-0 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 font-display">
                 <UserPlus className="h-5 w-5 text-primary" /> Invite Staff
@@ -283,19 +280,19 @@ export default function Settings() {
               </p>
               <div className="space-y-2">
                 <Label>Email Address</Label>
-                <Input type="email" placeholder="staff@clinic.com" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
+                <Input type="email" placeholder="staff@clinic.com" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} className="rounded-lg" />
               </div>
               <div className="space-y-2">
                 <Label>Role</Label>
                 <Select value={inviteRole} onValueChange={setInviteRole}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="rounded-lg"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="doctor">Doctor</SelectItem>
                     <SelectItem value="receptionist">Receptionist</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <Button onClick={handleInviteStaff} disabled={inviting || !inviteEmail.trim()}>
+              <Button onClick={handleInviteStaff} disabled={inviting || !inviteEmail.trim()} className="rounded-lg">
                 <Send className="mr-2 h-4 w-4" /> {inviting ? "Sending..." : "Send Invitation"}
               </Button>
             </CardContent>
@@ -304,7 +301,7 @@ export default function Settings() {
 
         {/* Team Management (Admin only) */}
         {profile?.role === "admin" && (
-          <Card className="shadow-card">
+          <Card className="rounded-2xl border-0 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 font-display">
                 <Users className="h-5 w-5 text-primary" /> Team
@@ -316,35 +313,34 @@ export default function Settings() {
               ) : team.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No team members yet. Invite staff above.</p>
               ) : (
-                <div className="space-y-3">
-                  {team.map((member) => {
-                    const roleBg = member.role === "admin" ? "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400"
-                      : member.role === "doctor" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                      : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400";
-                    return (
-                      <div key={member.user_id} className="flex items-center justify-between rounded-lg border border-border p-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 font-display text-sm font-bold text-primary">
-                            {(member.full_name || "?").charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="font-medium text-foreground text-sm">{member.full_name || "Unnamed"}</p>
-                            <Badge className={`capitalize text-xs mt-0.5 ${roleBg} border-0`}>{member.role}</Badge>
-                          </div>
-                        </div>
-                        {member.user_id !== user?.id && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => handleRemoveStaff(member.user_id, member.full_name)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
+                <div className="space-y-4">
+                  {/* Admins */}
+                  {admins.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Admins</p>
+                      <div className="space-y-2">
+                        {admins.map(member => renderTeamMember(member, "bg-primary/10 text-primary"))}
                       </div>
-                    );
-                  })}
+                    </div>
+                  )}
+                  {/* Doctors */}
+                  {doctors.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Doctors</p>
+                      <div className="space-y-2">
+                        {doctors.map(member => renderTeamMember(member, "bg-info/10 text-info"))}
+                      </div>
+                    </div>
+                  )}
+                  {/* Receptionists */}
+                  {receptionists.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Receptionists</p>
+                      <div className="space-y-2">
+                        {receptionists.map(member => renderTeamMember(member, "bg-warning/10 text-warning"))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -352,7 +348,7 @@ export default function Settings() {
         )}
 
         {/* Mobile App */}
-        <Card className="shadow-card">
+        <Card className="rounded-2xl border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 font-display">
               <Smartphone className="h-5 w-5 text-primary" /> Mobile App
@@ -360,11 +356,37 @@ export default function Settings() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              To build the native app, export this project to GitHub, clone locally, run <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">npm run build && npx cap sync</code>, then open in Android Studio or Xcode.
+              To build the native app, export this project to GitHub, clone locally, run <code className="rounded-lg bg-muted px-1.5 py-0.5 text-xs font-mono">npm run build && npx cap sync</code>, then open in Android Studio or Xcode.
             </p>
           </CardContent>
         </Card>
       </div>
     </DashboardLayout>
   );
+
+  function renderTeamMember(member: any, badgeClass: string) {
+    return (
+      <div key={member.user_id} className="flex items-center justify-between rounded-xl bg-muted/30 p-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 font-display text-sm font-bold text-primary">
+            {(member.full_name || "?").charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <p className="font-medium text-foreground text-sm">{member.full_name || "Unnamed"}</p>
+            <Badge className={`capitalize text-xs mt-0.5 ${badgeClass} border-0`}>{member.role}</Badge>
+          </div>
+        </div>
+        {member.user_id !== user?.id && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+            onClick={() => handleRemoveStaff(member.user_id, member.full_name)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+    );
+  }
 }
