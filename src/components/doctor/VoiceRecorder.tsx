@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -17,12 +17,14 @@ export default function VoiceRecorder({ visitId, onTranscriptProcessed }: Props)
   const [transcript, setTranscript] = useState("");
   const [manualMode, setManualMode] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [audioLevels, setAudioLevels] = useState<number[]>(new Array(24).fill(0));
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animFrameRef = useRef<number | null>(null);
 
-  // Live timer
   useEffect(() => {
     if (isRecording) {
       setElapsed(0);
@@ -39,128 +41,97 @@ export default function VoiceRecorder({ visitId, onTranscriptProcessed }: Props)
     return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
   };
 
+  const updateAudioLevels = useCallback(() => {
+    if (!analyserRef.current) return;
+    const data = new Uint8Array(analyserRef.current.frequencyBinCount);
+    analyserRef.current.getByteFrequencyData(data);
+    const bars = 24;
+    const step = Math.floor(data.length / bars);
+    const levels = Array.from({ length: bars }, (_, i) => {
+      const val = data[i * step] / 255;
+      return Math.max(0.08, val);
+    });
+    setAudioLevels(levels);
+    animFrameRef.current = requestAnimationFrame(updateAudioLevels);
+  }, []);
+
   const handleTranscription = useCallback(async (audioBlob: Blob) => {
     setIsTranscribing(true);
     try {
       const formData = new FormData();
       formData.append("audio", audioBlob, "recording.webm");
-
-      const { data, error } = await supabase.functions.invoke("transcribe-audio", {
-        body: formData,
-      });
+      const { data, error } = await supabase.functions.invoke("transcribe-audio", { body: formData });
 
       if (error) {
-        // Try to parse the error body for specific messages
-        let msg = "Transcription failed. Please try again.";
-        try {
-          const parsed = typeof error === "string" ? JSON.parse(error) : error;
-          if (parsed?.context?.body) {
-            const body = JSON.parse(parsed.context.body);
-            msg = body.error || msg;
-          }
-        } catch {
-          // Use default message
-        }
-        toast.error(msg);
-        setManualMode(true);
-        return;
+        let msg = "Transcription failed.";
+        try { const p = typeof error === "string" ? JSON.parse(error) : error; if (p?.context?.body) { const b = JSON.parse(p.context.body); msg = b.error || msg; } } catch {}
+        toast.error(msg); setManualMode(true); return;
       }
-
-      if (data?.error) {
-        toast.error(data.error);
-        setManualMode(true);
-        return;
-      }
+      if (data?.error) { toast.error(data.error); setManualMode(true); return; }
 
       if (data?.transcript) {
         setTranscript(data.transcript);
         toast.success("Transcription complete! Processing SOAP notes...");
-        // Auto-process through Claude
         try {
           const { data: soapData, error: soapError } = await supabase.functions.invoke("format-soap-notes", {
             body: { transcript: data.transcript },
           });
-
-          if (soapError) {
-            let soapMsg = "Failed to generate SOAP notes.";
-            try {
-              const parsed = typeof soapError === "string" ? JSON.parse(soapError) : soapError;
-              if (parsed?.context?.body) {
-                const body = JSON.parse(parsed.context.body);
-                soapMsg = body.error || soapMsg;
-              }
-            } catch {
-              // Use default
-            }
-            toast.error(soapMsg);
-            setManualMode(true);
-            return;
-          }
-
-          if (soapData?.error) {
-            toast.error(soapData.error);
-            setManualMode(true);
-            return;
-          }
-
+          if (soapError) { toast.error("Failed to generate SOAP notes."); setManualMode(true); return; }
+          if (soapData?.error) { toast.error(soapData.error); setManualMode(true); return; }
           onTranscriptProcessed(soapData);
-          toast.success("SOAP notes generated!");
-        } catch (err: any) {
-          toast.error(err.message || "Failed to process SOAP notes");
-          setManualMode(true);
-        }
-      } else {
-        toast.error("No transcript received. Please type your notes manually.");
-        setManualMode(true);
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Transcription failed. Type your notes manually.");
-      setManualMode(true);
-    } finally {
-      setIsTranscribing(false);
-    }
+        } catch (err: any) { toast.error(err.message || "Failed to process SOAP notes"); setManualMode(true); }
+      } else { toast.error("No transcript received."); setManualMode(true); }
+    } catch (err: any) { toast.error(err.message || "Transcription failed."); setManualMode(true); }
+    finally { setIsTranscribing(false); }
   }, [onTranscriptProcessed]);
 
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      // Set up Web Audio API analyser for waveform
+      const audioCtx = new AudioContext();
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
       };
 
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach(track => track.stop());
+        audioCtx.close();
+        if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+        analyserRef.current = null;
+        setAudioLevels(new Array(24).fill(0));
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         await handleTranscription(audioBlob);
       };
 
       mediaRecorder.start();
       setIsRecording(true);
+      animFrameRef.current = requestAnimationFrame(updateAudioLevels);
       toast.info("Recording started...");
     } catch {
-      toast.error("Microphone access denied. You can type your notes manually instead.");
+      toast.error("Microphone access denied.");
       setManualMode(true);
     }
   };
 
   const stopRecording = () => {
-    console.log('stopRecording called', mediaRecorderRef.current?.state);
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (animFrameRef.current) { cancelAnimationFrame(animFrameRef.current); animFrameRef.current = null; }
+    if (mediaRecorderRef.current?.state === 'recording') {
+      mediaRecorderRef.current.stop();
     }
-    if (mediaRecorderRef.current) {
-      if (mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop();
-      }
-      setIsRecording(false);
-    }
+    setIsRecording(false);
   };
 
   const processManualTranscript = async () => {
@@ -170,39 +141,17 @@ export default function VoiceRecorder({ visitId, onTranscriptProcessed }: Props)
       const { data, error } = await supabase.functions.invoke("format-soap-notes", {
         body: { transcript: transcript.trim() },
       });
-
-      if (error) {
-        let msg = "Failed to generate SOAP notes.";
-        try {
-          const parsed = typeof error === "string" ? JSON.parse(error) : error;
-          if (parsed?.context?.body) {
-            const body = JSON.parse(parsed.context.body);
-            msg = body.error || msg;
-          }
-        } catch {
-          // Use default
-        }
-        toast.error(msg);
-        return;
-      }
-
-      if (data?.error) {
-        toast.error(data.error);
-        return;
-      }
-
+      if (error) { toast.error("Failed to generate SOAP notes."); return; }
+      if (data?.error) { toast.error(data.error); return; }
       onTranscriptProcessed(data);
       toast.success("SOAP notes generated!");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to process notes");
-    } finally {
-      setIsTranscribing(false);
-    }
+    } catch (err: any) { toast.error(err.message || "Failed to process notes"); }
+    finally { setIsTranscribing(false); }
   };
 
   if (isTranscribing) {
     return (
-      <Card className="shadow-card">
+      <Card className="rounded-2xl border-0 shadow-sm">
         <CardContent className="flex flex-col items-center justify-center gap-4 py-16">
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
           <p className="font-display text-lg font-semibold text-foreground">Transcribing your notes...</p>
@@ -213,34 +162,44 @@ export default function VoiceRecorder({ visitId, onTranscriptProcessed }: Props)
   }
 
   return (
-    <Card className="shadow-card">
-      <CardHeader>
-        <CardTitle className="font-display text-lg flex items-center gap-2">
-          <Mic className="h-5 w-5 text-primary" /> Voice Recording & AI Scribe
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Card className="rounded-2xl border-0 shadow-sm overflow-hidden">
+      <CardContent className="p-0">
         {!manualMode ? (
-          <div className="flex flex-col items-center gap-6 py-8">
+          <div className={`flex flex-col items-center gap-6 py-10 px-6 transition-all duration-500 ${isRecording ? "bg-[hsl(0,0%,11%)]" : "bg-card"}`}>
+            {/* Waveform bars */}
+            {isRecording && (
+              <div className="flex items-end gap-[3px] h-16">
+                {audioLevels.map((level, i) => (
+                  <div
+                    key={i}
+                    className="w-[4px] rounded-full bg-destructive transition-all duration-75"
+                    style={{ height: `${Math.max(4, level * 64)}px` }}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Timer */}
+            {isRecording && (
+              <p className="font-mono text-4xl font-light text-white tracking-wider">{formatTime(elapsed)}</p>
+            )}
+
+            {/* Record / Stop button */}
             <div className="relative">
               {isRecording ? (
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    stopRecording();
-                  }}
-                  style={{ pointerEvents: 'all', zIndex: 9999, cursor: 'pointer' }}
+                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); stopRecording(); }}
                   className="flex h-20 w-20 items-center justify-center rounded-full bg-destructive hover:bg-destructive/90 transition-all shadow-lg"
+                  style={{ pointerEvents: 'all', zIndex: 9999 }}
                 >
-                  <Square className="h-8 w-8 text-destructive-foreground" fill="currentColor" />
+                  <Square className="h-7 w-7 text-white" fill="currentColor" />
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={startRecording}
-                  className="flex h-24 w-24 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-elevated hover:scale-105 transition-all"
+                  className="flex h-24 w-24 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-105 transition-all"
                 >
                   <Mic className="h-10 w-10" />
                 </button>
@@ -249,30 +208,30 @@ export default function VoiceRecorder({ visitId, onTranscriptProcessed }: Props)
                 <span className="absolute inset-0 animate-pulse-ring rounded-full border-2 border-destructive pointer-events-none" />
               )}
             </div>
-            {isRecording && (
-              <p className="font-mono text-2xl font-bold text-destructive">{formatTime(elapsed)}</p>
-            )}
-            <p className="text-sm text-muted-foreground">
-              {isRecording ? "Recording... Click to stop" : "Click to start recording"}
+
+            <p className={`text-sm ${isRecording ? "text-white/60" : "text-muted-foreground"}`}>
+              {isRecording ? "Recording... Tap to stop" : "Tap to start recording"}
             </p>
-            <Button variant="link" size="sm" onClick={() => setManualMode(true)} className="text-muted-foreground">
-              Or type notes manually
-            </Button>
+            {!isRecording && (
+              <Button variant="link" size="sm" onClick={() => setManualMode(true)} className="text-muted-foreground">
+                Or type notes manually
+              </Button>
+            )}
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 p-6">
             <Textarea
               rows={6}
               value={transcript}
               onChange={e => setTranscript(e.target.value)}
-              placeholder="Type or paste your clinical notes here. The AI will convert them into structured SOAP notes and extract prescriptions..."
-              className="resize-none"
+              placeholder="Type or paste your clinical notes here..."
+              className="resize-none rounded-lg"
             />
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setManualMode(false)}>
+              <Button variant="outline" size="sm" onClick={() => setManualMode(false)} className="rounded-lg">
                 <Mic className="mr-2 h-4 w-4" /> Use Microphone
               </Button>
-              <Button onClick={processManualTranscript} disabled={isTranscribing || !transcript.trim()} className="flex-1">
+              <Button onClick={processManualTranscript} disabled={isTranscribing || !transcript.trim()} className="flex-1 rounded-lg">
                 Generate SOAP Notes with AI
               </Button>
             </div>
