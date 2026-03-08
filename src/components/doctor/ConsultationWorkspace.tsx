@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useClinic } from "@/hooks/useClinic";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,9 +38,48 @@ type Medication = {
   evening: boolean; night: boolean; duration: string; notes: string;
 };
 
+// Human-readable labels for template section keys
+const SECTION_LABELS: Record<string, { label: string; placeholder: string }> = {
+  subjective: { label: "Subjective", placeholder: "Patient's symptoms and history..." },
+  objective: { label: "Objective", placeholder: "Physical exam findings, vitals..." },
+  assessment: { label: "Assessment", placeholder: "Diagnosis and clinical reasoning..." },
+  plan: { label: "Plan", placeholder: "Treatment plan, follow-up..." },
+  hpi: { label: "History of Present Illness", placeholder: "Detailed history of present illness..." },
+  ros: { label: "Review of Systems", placeholder: "Systems review findings..." },
+  physical_exam: { label: "Physical Examination", placeholder: "Physical exam findings..." },
+  history: { label: "History", placeholder: "Patient history..." },
+  examination: { label: "Examination", placeholder: "Examination findings..." },
+  diagnosis: { label: "Diagnosis", placeholder: "Diagnosis..." },
+  treatment: { label: "Treatment Plan", placeholder: "Treatment plan..." },
+  vitals_review: { label: "Vitals Review", placeholder: "Vitals findings..." },
+  systems_review: { label: "Systems Review", placeholder: "Systems review..." },
+  recommendations: { label: "Recommendations", placeholder: "Recommendations..." },
+  presenting_complaint: { label: "Presenting Complaint", placeholder: "Chief presenting complaint..." },
+  investigations: { label: "Investigations", placeholder: "Investigation findings..." },
+  admission_diagnosis: { label: "Admission Diagnosis", placeholder: "Admission diagnosis..." },
+  management_plan: { label: "Management Plan", placeholder: "Management plan..." },
+  interval_history: { label: "Interval History", placeholder: "Changes since last visit..." },
+  current_status: { label: "Current Status", placeholder: "Current patient status..." },
+  medication_review: { label: "Medication Review", placeholder: "Review of current medications..." },
+  plan_adjustment: { label: "Plan Adjustment", placeholder: "Adjustments to treatment plan..." },
+  reason_for_referral: { label: "Reason for Referral", placeholder: "Why this referral is needed..." },
+  clinical_summary: { label: "Clinical Summary", placeholder: "Summary of clinical findings..." },
+  current_medications: { label: "Current Medications", placeholder: "List of current medications..." },
+  request: { label: "Request", placeholder: "What is being requested..." },
+  medications: { label: "Medications", placeholder: "Prescribed medications..." },
+  instructions: { label: "Instructions", placeholder: "Patient instructions..." },
+  cancer_history: { label: "Cancer History", placeholder: "Cancer history and staging..." },
+  treatment_history: { label: "Treatment History", placeholder: "Previous treatments..." },
+  chief_complaint: { label: "Chief Complaint", placeholder: "Primary complaint..." },
+  treatment_plan: { label: "Treatment Plan", placeholder: "Treatment plan..." },
+};
+
 const tabs = ["summary", "history", "voice", "soap", "prescription", "documents"] as const;
 const tabLabels = ["Summary", "History", "Voice", "SOAP", "Rx", "Docs"];
 const tabIcons = [User, History, Mic, FileText, Pill, Upload];
+
+// Default SOAP sections if no template selected
+const DEFAULT_SECTIONS = ["subjective", "objective", "assessment", "plan"];
 
 export default function ConsultationWorkspace({ visit, onComplete }: { visit: Visit; onComplete: () => void }) {
   const { profile } = useAuth();
@@ -48,14 +87,29 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
   const isMobile = useIsMobile();
   const [tab, setTab] = useState<string>("summary");
 
-  // SOAP Notes
-  const [subjective, setSubjective] = useState("");
-  const [objective, setObjective] = useState("");
-  const [assessment, setAssessment] = useState("");
-  const [plan, setPlan] = useState("");
+  // Dynamic note fields keyed by section name
+  const [noteFields, setNoteFields] = useState<Record<string, string>>({
+    subjective: "", objective: "", assessment: "", plan: "",
+  });
 
   // Template
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+  const [activeSections, setActiveSections] = useState<string[]>(DEFAULT_SECTIONS);
+
+  // Doctor's enabled templates
+  const [enabledTemplateNames, setEnabledTemplateNames] = useState<string[]>(["SOAP Notes"]);
+
+  useEffect(() => {
+    if (doctor) {
+      // Fetch enabled templates from doctors table
+      supabase.from("doctors").select("enabled_templates").eq("id", doctor.id).single()
+        .then(({ data }) => {
+          if (data?.enabled_templates && Array.isArray(data.enabled_templates)) {
+            setEnabledTemplateNames(data.enabled_templates as string[]);
+          }
+        });
+    }
+  }, [doctor]);
 
   // Prescription
   const [medications, setMedications] = useState<Medication[]>([
@@ -77,11 +131,30 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
 
   const vitals = visit.vitals || {};
 
+  const handleTemplateChange = (template: any) => {
+    setSelectedTemplate(template);
+    if (template?.sections && Array.isArray(template.sections)) {
+      setActiveSections(template.sections);
+      // Initialize any missing note fields
+      const newFields = { ...noteFields };
+      template.sections.forEach((s: string) => {
+        if (!(s in newFields)) newFields[s] = "";
+      });
+      setNoteFields(newFields);
+    } else {
+      setActiveSections(DEFAULT_SECTIONS);
+    }
+  };
+
+  const updateNoteField = (key: string, value: string) => {
+    setNoteFields(prev => ({ ...prev, [key]: value }));
+  };
+
   const handleTranscriptProcessed = (soapData: any) => {
-    if (soapData.subjective) setSubjective(soapData.subjective);
-    if (soapData.objective) setObjective(soapData.objective);
-    if (soapData.assessment) setAssessment(soapData.assessment);
-    if (soapData.plan) setPlan(soapData.plan);
+    if (soapData.subjective) updateNoteField("subjective", soapData.subjective);
+    if (soapData.objective) updateNoteField("objective", soapData.objective);
+    if (soapData.assessment) updateNoteField("assessment", soapData.assessment);
+    if (soapData.plan) updateNoteField("plan", soapData.plan);
     if (soapData.medications?.length) {
       setMedications(soapData.medications.map((m: any) => ({
         name: m.name || "", dosage: m.dosage || "",
@@ -101,9 +174,31 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
     setMedications(prev => prev.map((m, i) => i === idx ? { ...m, [field]: value } : m));
   };
 
+  // Build SOAP notes object from active sections for saving
+  const buildSoapNotes = () => {
+    const soap: Record<string, string> = {};
+    activeSections.forEach(s => {
+      if (noteFields[s]?.trim()) soap[s] = noteFields[s];
+    });
+    return soap;
+  };
+
+  // Get assessment-like field for validation
+  const getAssessmentField = () => {
+    // Check for assessment, diagnosis, or admission_diagnosis in active sections
+    for (const key of ["assessment", "diagnosis", "admission_diagnosis", "current_status"]) {
+      if (activeSections.includes(key) && noteFields[key]?.trim()) return noteFields[key];
+    }
+    // If no assessment-type field, accept any filled field
+    for (const key of activeSections) {
+      if (noteFields[key]?.trim()) return noteFields[key];
+    }
+    return "";
+  };
+
   const handleCompleteConsultation = async () => {
-    if (!assessment.trim()) {
-      toast.error("Please fill in at least the Assessment in SOAP notes before completing.");
+    if (!getAssessmentField()) {
+      toast.error("Please fill in at least one field in the clinical notes before completing.");
       setTab("soap");
       return;
     }
@@ -113,9 +208,11 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
         .from("doctors").select("id").eq("user_id", profile!.user_id).single();
       if (!doctorRow) throw new Error("Doctor profile not found");
 
+      const soapNotes = buildSoapNotes();
+
       await supabase.from("clinical_notes").insert({
         visit_id: visit.id, doctor_id: doctorRow.id,
-        soap_notes: { subjective, objective, assessment, plan },
+        soap_notes: soapNotes,
       });
 
       const validMeds = medications.filter(m => m.name.trim());
@@ -133,9 +230,12 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
 
       await supabase.from("visits").update({ status: "completed", doctor_id: doctorRow.id }).eq("id", visit.id);
 
-      // Save default template for doctor
-      if (selectedTemplate?.name) {
-        await supabase.from("doctors").update({ default_template: selectedTemplate.name } as any).eq("id", doctorRow.id);
+      // Save default template for doctor (both name and id)
+      if (selectedTemplate) {
+        await supabase.from("doctors").update({
+          default_template: selectedTemplate.name,
+          default_template_id: selectedTemplate.id,
+        } as any).eq("id", doctorRow.id);
       }
 
       if (prescriptionId) {
@@ -159,12 +259,6 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
     } finally {
       setSaving(false);
     }
-  };
-
-  // Map tab key to content
-  const tabContentMap: Record<string, string> = {
-    summary: "summary", history: "history", voice: "voice",
-    soap: "soap", prescription: "prescription", documents: "documents",
   };
 
   return (
@@ -319,7 +413,7 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
           patient: { name: visit.patient.name, healthcare_id: visit.patient.healthcare_id, dob: visit.patient.dob, gender: visit.patient.gender, phone: visit.patient.phone },
           visit: { id: visit.id, chief_complaint: visit.chief_complaint },
           doctor: { name: doctor?.name || "", registration_number: doctor?.registration_number || "" },
-          soap: { subjective, objective, assessment, plan },
+          soap: buildSoapNotes(),
           medications,
           investigations: investigations ? investigations.split(",").map(s => s.trim()) : [],
           followUpDate,
@@ -355,17 +449,33 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
     return (
       <Card className="rounded-2xl border-0 shadow-sm">
         <CardContent className="space-y-4 p-6">
-          {profile?.clinic_id && (
+          {profile?.clinic_id && doctor && (
             <TemplateSelector
               clinicId={profile.clinic_id}
+              doctorId={doctor.id}
               doctorDefaultTemplateId={(doctor as any)?.default_template_id || null}
-              onTemplateChange={setSelectedTemplate}
+              enabledTemplateNames={enabledTemplateNames}
+              onTemplateChange={handleTemplateChange}
             />
           )}
-          <div className="space-y-2"><Label className="font-semibold">Subjective</Label><Textarea rows={3} value={subjective} onChange={e => setSubjective(e.target.value)} placeholder="Patient's symptoms and history..." className="rounded-lg" /></div>
-          <div className="space-y-2"><Label className="font-semibold">Objective</Label><Textarea rows={3} value={objective} onChange={e => setObjective(e.target.value)} placeholder="Physical exam findings, vitals..." className="rounded-lg" /></div>
-          <div className="space-y-2"><Label className="font-semibold">Assessment</Label><Textarea rows={3} value={assessment} onChange={e => setAssessment(e.target.value)} placeholder="Diagnosis and clinical reasoning..." className="rounded-lg" /></div>
-          <div className="space-y-2"><Label className="font-semibold">Plan</Label><Textarea rows={3} value={plan} onChange={e => setPlan(e.target.value)} placeholder="Treatment plan, follow-up..." className="rounded-lg" /></div>
+          {activeSections.map(section => {
+            const meta = SECTION_LABELS[section] || { 
+              label: section.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()), 
+              placeholder: `Enter ${section.replace(/_/g, " ")}...` 
+            };
+            return (
+              <div key={section} className="space-y-2">
+                <Label className="font-semibold">{meta.label}</Label>
+                <Textarea
+                  rows={3}
+                  value={noteFields[section] || ""}
+                  onChange={e => updateNoteField(section, e.target.value)}
+                  placeholder={meta.placeholder}
+                  className="rounded-lg"
+                />
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
     );
