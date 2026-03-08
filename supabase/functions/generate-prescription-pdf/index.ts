@@ -30,7 +30,8 @@ serve(async (req) => {
     const { data: doctor } = await supabaseAdmin
       .from("doctors").select("*").eq("id", prescription.doctor_id).single()
     const { data: clinic } = await supabaseAdmin
-      .from("clinics").select("*").eq("id", visit.clinic_id).single()
+      .from("clinics").select("id, name, address, phone, regional_language")
+      .eq("id", visit.clinic_id).single()
     const { data: notes } = await supabaseAdmin
       .from("clinical_notes").select("soap_notes")
       .eq("visit_id", visit_id)
@@ -42,6 +43,9 @@ serve(async (req) => {
     const meds = (prescription.medications || []) as any[]
     const vitals = (visit.vitals || {}) as any
     const investigations = (prescription.investigations || []) as string[]
+
+    const lang = clinic?.regional_language || null
+    console.log("Regional language:", lang)
 
     const getAge = (dob: string) => dob
       ? String(Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000)))
@@ -66,7 +70,10 @@ serve(async (req) => {
     const lineH = 16
 
     const drawText = (text: string, x: number, yPos: number, size = 10, font = fontRegular, color = dark) => {
-      page.drawText(String(text || ""), { x, y: yPos, size, font, color })
+      // Filter non-ASCII characters that pdf-lib can't render with standard fonts
+      const safe = String(text || "").replace(/[^\x20-\x7E]/g, "")
+      if (!safe) return
+      try { page.drawText(safe, { x, y: yPos, size, font, color }) } catch {}
     }
 
     const drawLine = (yPos: number, color = teal, thickness = 1) => {
@@ -80,12 +87,13 @@ serve(async (req) => {
     const truncate = (str: string, max: number) =>
       str && str.length > max ? str.substring(0, max) + "..." : str || ""
 
-    // ── HEADER ──────────────────────────────────────────
+    // -- HEADER --
     drawRect(left, y + 10, right - left, 60, rgb(0.035, 0.271, 0.271))
 
     drawText(clinic?.name || "Clinic", left + 10, y - 5, 18, fontBold, white)
     drawText(clinic?.address || "", left + 10, y - 22, 8, fontRegular, rgb(0.8, 0.9, 0.9))
     drawText(clinic?.phone ? "Tel: " + clinic.phone : "", left + 10, y - 33, 8, fontRegular, rgb(0.8, 0.9, 0.9))
+    if (lang) drawText("Language: " + lang, left + 10, y - 44, 7, fontRegular, rgb(0.6, 0.85, 0.85))
 
     const drName = doctor?.name || "Doctor"
     const drNameW = fontBold.widthOfTextAtSize(drName, 12)
@@ -102,7 +110,7 @@ serve(async (req) => {
 
     y -= 70
 
-    // ── PATIENT BAR ─────────────────────────────────────
+    // -- PATIENT BAR --
     page.drawRectangle({ x: left, y: y - 36, width: right - left, height: 40, borderColor: teal, borderWidth: 0.5, color: rgb(0.941, 0.980, 0.980) })
 
     const colW = (right - left) / 4
@@ -120,7 +128,7 @@ serve(async (req) => {
 
     y -= 50
 
-    // ── VITALS ──────────────────────────────────────────
+    // -- VITALS --
     if (Object.keys(vitals).length > 0) {
       drawText("VITALS", left, y, 8, fontBold, teal)
       y -= 4
@@ -130,7 +138,7 @@ serve(async (req) => {
       const vitalItems = [
         vitals.bp_sys ? `BP: ${vitals.bp_sys}/${vitals.bp_dia} mmHg` : null,
         vitals.pulse ? `Pulse: ${vitals.pulse} bpm` : null,
-        vitals.temp || vitals.temperature ? `Temp: ${vitals.temp || vitals.temperature}°F` : null,
+        vitals.temp || vitals.temperature ? `Temp: ${vitals.temp || vitals.temperature}F` : null,
         vitals.spo2 ? `SpO2: ${vitals.spo2}%` : null,
         vitals.weight ? `Wt: ${vitals.weight} kg` : null,
         vitals.height ? `Ht: ${vitals.height} cm` : null,
@@ -146,7 +154,7 @@ serve(async (req) => {
       y -= 26
     }
 
-    // ── CHIEF COMPLAINT ─────────────────────────────────
+    // -- CHIEF COMPLAINT --
     if (visit.chief_complaint) {
       drawText("CHIEF COMPLAINT", left, y, 8, fontBold, teal)
       y -= 4
@@ -156,7 +164,7 @@ serve(async (req) => {
       y -= 20
     }
 
-    // ── SOAP NOTES ──────────────────────────────────────
+    // -- SOAP NOTES --
     if (soap.assessment || soap.subjective) {
       drawText("CLINICAL NOTES (SOAP)", left, y, 8, fontBold, teal)
       y -= 4
@@ -193,49 +201,63 @@ serve(async (req) => {
       y -= 6
     }
 
-    // ── MEDICATIONS ─────────────────────────────────────
+    // -- MEDICATIONS WITH TIMING --
     if (meds.length > 0) {
       drawText("Rx  PRESCRIPTION", left, y, 10, fontBold, teal)
       y -= 4
       drawLine(y, teal, 1)
       y -= 6
 
-      const cols = [30, 130, 60, 60, 60, 100]
-      const colX = [left]
-      cols.forEach((w, i) => colX.push(colX[i] + w))
-      const headers = ["#", "Drug", "Dosage", "Freq", "Duration", "Instructions"]
+      // Columns: #, Drug, Dosage, M, A, E, N, Duration
+      const cw = [22, 110, 55, 35, 35, 35, 35, 60]
+      const cx = [left]
+      cw.forEach((w, i) => cx.push(cx[i] + w))
+      const headers = ["#", "Drug", "Dosage", "M", "A", "E", "N", "Duration"]
 
       drawRect(left, y + 4, right - left, 18, teal)
-      headers.forEach((h, i) => drawText(h, colX[i] + 3, y - 6, 8, fontBold, white))
+      headers.forEach((h, i) => drawText(h, cx[i] + 3, y - 6, 7, fontBold, white))
       y -= 20
 
       meds.forEach((m: any, idx: number) => {
         if (idx % 2 === 0) drawRect(left, y + 4, right - left, 16, rgb(0.97, 0.99, 0.99))
-        const row = [String(idx + 1), m.name || "—", m.dosage || "—", m.frequency || "—", m.duration || "—", m.instructions || "—"]
-        row.forEach((val, i) => drawText(truncate(val, i === 1 ? 18 : 14), colX[i] + 3, y - 4, 9, i === 1 ? fontBold : fontRegular, dark))
+        const row = [
+          String(idx + 1),
+          m.name || "—",
+          m.dosage || "—",
+          m.morning ? "Y" : "-",
+          m.afternoon ? "Y" : "-",
+          m.evening ? "Y" : "-",
+          m.night ? "Y" : "-",
+          m.duration || "—"
+        ]
+        row.forEach((val, i) => {
+          drawText(truncate(val, i === 1 ? 18 : 14), cx[i] + 3, y - 4, 9,
+            i === 1 ? fontBold : fontRegular,
+            [3,4,5,6].includes(i) && val === "Y" ? teal : dark)
+        })
         y -= 16
       })
       y -= 8
     }
 
-    // ── INVESTIGATIONS ──────────────────────────────────
+    // -- INVESTIGATIONS --
     if (investigations.length > 0) {
       drawText("INVESTIGATIONS ADVISED", left, y, 8, fontBold, teal)
       y -= 4
       drawLine(y, teal, 0.5)
       y -= 14
-      drawText(investigations.join("  •  "), left, y, 9, fontRegular, dark)
+      drawText(investigations.join("  |  "), left, y, 9, fontRegular, dark)
       y -= 20
     }
 
-    // ── FOLLOW UP ───────────────────────────────────────
+    // -- FOLLOW UP --
     if (prescription.follow_up_date) {
       page.drawRectangle({ x: left, y: y - 16, width: right - left, height: 20, borderColor: rgb(0.99, 0.83, 0.2), borderWidth: 0.5, color: rgb(1, 0.99, 0.88) })
       drawText("Follow-up: " + new Date(prescription.follow_up_date).toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" }), left + 8, y - 4, 10, fontBold, rgb(0.5, 0.35, 0))
       y -= 28
     }
 
-    // ── SIGNATURE ───────────────────────────────────────
+    // -- SIGNATURE --
     y -= 20
     const sigX = right - 180
     page.drawLine({ start: { x: sigX, y }, end: { x: right, y }, thickness: 0.5, color: dark })
@@ -243,7 +265,7 @@ serve(async (req) => {
     drawText(doctor?.qualification || "", sigX, y - 26, 8, fontRegular, gray)
     drawText(doctor?.registration_number ? "Reg: " + doctor.registration_number : "", sigX, y - 37, 8, fontRegular, gray)
 
-    // ── FOOTER ──────────────────────────────────────────
+    // -- FOOTER --
     drawLine(50, rgb(0.8, 0.8, 0.8), 0.5)
     drawText("Generated by StethoScribe", left, 38, 8, fontRegular, gray)
     const dateStr = new Date().toLocaleString("en-IN")
@@ -253,7 +275,7 @@ serve(async (req) => {
     // Serialize PDF
     const pdfBytes = await pdfDoc.save()
 
-    // Upload to storage as .pdf
+    // Upload to storage
     const path = `${visit.clinic_id}/${new Date().getFullYear()}/${prescription_id}.pdf`
     await supabaseAdmin.storage.from("prescriptions").upload(path, pdfBytes, {
       contentType: "application/pdf",

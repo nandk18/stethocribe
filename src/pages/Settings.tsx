@@ -9,14 +9,26 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
-import { Building2, User, Save, Loader2, UserPlus, Send, Smartphone, Shield, Users, Trash2, Globe } from "lucide-react";
+import { Building2, User, Save, Loader2, UserPlus, Send, Smartphone, Shield, Users, Trash2, Globe, Pencil } from "lucide-react";
 
 const LANGUAGES = [
   "Tamil","Hindi","Telugu","Kannada","Malayalam","Marathi",
   "Bengali","Gujarati","Punjabi","Odia","Assamese","Urdu",
   "Konkani","Manipuri","Sindhi"
 ];
+
+type TeamMember = {
+  user_id: string;
+  full_name: string | null;
+  role: string;
+  created_at: string;
+  display_name: string;
+  qualification: string;
+  specialty: string;
+  registration_number: string;
+};
 
 export default function Settings() {
   const { user, profile } = useAuth();
@@ -33,20 +45,26 @@ export default function Settings() {
   const [regNumber, setRegNumber] = useState("");
   const [specialty, setSpecialty] = useState("");
 
-  // Staff invite
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<string>("receptionist");
   const [inviting, setInviting] = useState(false);
 
-  // Change password
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
 
-  // Team
-  const [team, setTeam] = useState<any[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loadingTeam, setLoadingTeam] = useState(false);
+
+  // Edit panel
+  const [editOpen, setEditOpen] = useState(false);
+  const [editMember, setEditMember] = useState<TeamMember | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editQualification, setEditQualification] = useState("");
+  const [editSpecialty, setEditSpecialty] = useState("");
+  const [editRegNumber, setEditRegNumber] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
 
   useEffect(() => {
     if (clinic) {
@@ -67,20 +85,36 @@ export default function Settings() {
   }, [doctor]);
 
   useEffect(() => {
-    if (profile?.clinic_id && profile.role === "admin") {
-      fetchTeam();
-    }
-  }, [profile]);
+    if (user) fetchTeam();
+  }, [user]);
 
   const fetchTeam = async () => {
-    if (!profile?.clinic_id) return;
+    if (!user) return;
     setLoadingTeam(true);
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("user_id, full_name, role, created_at")
-      .eq("clinic_id", profile.clinic_id)
-      .order("role");
-    setTeam(profileData || []);
+
+    const { data: myProfile } = await supabase
+      .from("profiles").select("clinic_id").eq("user_id", user.id).single();
+    if (!myProfile?.clinic_id) { setLoadingTeam(false); return; }
+
+    const [profilesRes, doctorsRes] = await Promise.all([
+      supabase.from("profiles").select("user_id, full_name, role, created_at")
+        .eq("clinic_id", myProfile.clinic_id).order("created_at", { ascending: true }),
+      supabase.from("doctors").select("user_id, name, qualification, specialty, registration_number")
+        .eq("clinic_id", myProfile.clinic_id),
+    ]);
+
+    const enriched = (profilesRes.data || []).map(p => {
+      const doctorDetail = doctorsRes.data?.find(d => d.user_id === p.user_id);
+      return {
+        ...p,
+        display_name: doctorDetail?.name || p.full_name || p.user_id,
+        qualification: doctorDetail?.qualification || "",
+        specialty: doctorDetail?.specialty || "",
+        registration_number: doctorDetail?.registration_number || "",
+      };
+    });
+
+    setTeamMembers(enriched as TeamMember[]);
     setLoadingTeam(false);
   };
 
@@ -143,20 +177,12 @@ export default function Settings() {
   };
 
   const handleChangePassword = async () => {
-    if (newPassword !== confirmNewPassword) {
-      toast.error("Passwords do not match");
-      return;
-    }
-    if (newPassword.length < 8) {
-      toast.error("Password must be at least 8 characters");
-      return;
-    }
+    if (newPassword !== confirmNewPassword) { toast.error("Passwords do not match"); return; }
+    if (newPassword.length < 8) { toast.error("Password must be at least 8 characters"); return; }
     if (!user?.email) return;
     setChangingPassword(true);
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email, password: currentPassword,
-      });
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email: user.email, password: currentPassword });
       if (signInError) { toast.error("Current password is incorrect"); setChangingPassword(false); return; }
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
@@ -175,6 +201,36 @@ export default function Settings() {
     } catch (err: any) { toast.error(err.message); }
   };
 
+  const openEditPanel = (member: TeamMember) => {
+    setEditMember(member);
+    setEditName(member.display_name);
+    setEditQualification(member.qualification);
+    setEditSpecialty(member.specialty);
+    setEditRegNumber(member.registration_number);
+    setEditOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editMember || !profile?.clinic_id) return;
+    setEditSaving(true);
+    try {
+      if (editMember.role === "doctor") {
+        const { error } = await supabase.from("doctors").update({
+          name: editName, qualification: editQualification,
+          specialty: editSpecialty, registration_number: editRegNumber,
+        }).eq("user_id", editMember.user_id).eq("clinic_id", profile.clinic_id);
+        if (error) throw error;
+      }
+      // Update profile name for all roles
+      await supabase.from("profiles").update({ full_name: editName }).eq("user_id", editMember.user_id);
+      toast.success("Updated successfully");
+      setEditOpen(false);
+      fetchTeam();
+      refetch();
+    } catch (err: any) { toast.error(err.message); }
+    finally { setEditSaving(false); }
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -185,9 +241,17 @@ export default function Settings() {
     );
   }
 
-  const doctors = team.filter(m => m.role === "doctor");
-  const receptionists = team.filter(m => m.role === "receptionist");
-  const admins = team.filter(m => m.role === "admin");
+  const grouped = {
+    admin: teamMembers.filter(m => m.role === "admin"),
+    doctor: teamMembers.filter(m => m.role === "doctor"),
+    receptionist: teamMembers.filter(m => m.role === "receptionist"),
+  };
+
+  const roleBadgeClass: Record<string, string> = {
+    admin: "bg-primary/10 text-primary",
+    doctor: "bg-info/10 text-info",
+    receptionist: "bg-warning/10 text-warning",
+  };
 
   return (
     <DashboardLayout>
@@ -226,26 +290,28 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        {/* Doctor Profile */}
-        <Card className="rounded-2xl border-0 shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 font-display">
-              <User className="h-5 w-5 text-primary" /> Doctor Profile
-              {!doctor && <span className="text-xs text-destructive font-normal ml-2">(Not set up yet)</span>}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2"><Label>Doctor Name</Label><Input value={doctorName} onChange={e => setDoctorName(e.target.value)} placeholder="Dr. Name" className="rounded-lg" /></div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Qualification</Label><Input value={qualification} onChange={e => setQualification(e.target.value)} placeholder="MBBS, MD" className="rounded-lg" /></div>
-              <div className="space-y-2"><Label>Specialty</Label><Input value={specialty} onChange={e => setSpecialty(e.target.value)} placeholder="General Medicine" className="rounded-lg" /></div>
-            </div>
-            <div className="space-y-2"><Label>Registration Number</Label><Input value={regNumber} onChange={e => setRegNumber(e.target.value)} placeholder="MCI-123456" className="rounded-lg" /></div>
-            <Button onClick={handleSaveDoctor} disabled={saving} className="rounded-lg">
-              <Save className="mr-2 h-4 w-4" /> {doctor ? "Update" : "Create"} Doctor Profile
-            </Button>
-          </CardContent>
-        </Card>
+        {/* Doctor Profile (only for doctor/admin roles) */}
+        {(profile?.role === "doctor" || profile?.role === "admin") && (
+          <Card className="rounded-2xl border-0 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 font-display">
+                <User className="h-5 w-5 text-primary" /> Doctor Profile
+                {!doctor && <span className="text-xs text-destructive font-normal ml-2">(Not set up yet)</span>}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2"><Label>Doctor Name</Label><Input value={doctorName} onChange={e => setDoctorName(e.target.value)} placeholder="Dr. Name" className="rounded-lg" /></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2"><Label>Qualification</Label><Input value={qualification} onChange={e => setQualification(e.target.value)} placeholder="MBBS, MD" className="rounded-lg" /></div>
+                <div className="space-y-2"><Label>Specialty</Label><Input value={specialty} onChange={e => setSpecialty(e.target.value)} placeholder="General Medicine" className="rounded-lg" /></div>
+              </div>
+              <div className="space-y-2"><Label>Registration Number</Label><Input value={regNumber} onChange={e => setRegNumber(e.target.value)} placeholder="MCI-123456" className="rounded-lg" /></div>
+              <Button onClick={handleSaveDoctor} disabled={saving} className="rounded-lg">
+                <Save className="mr-2 h-4 w-4" /> {doctor ? "Update" : "Create"} Doctor Profile
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Security */}
         <Card className="rounded-2xl border-0 shadow-sm">
@@ -299,7 +365,7 @@ export default function Settings() {
           </Card>
         )}
 
-        {/* Team Management (Admin only) */}
+        {/* Team Management */}
         {profile?.role === "admin" && (
           <Card className="rounded-2xl border-0 shadow-sm">
             <CardHeader>
@@ -310,37 +376,53 @@ export default function Settings() {
             <CardContent>
               {loadingTeam ? (
                 <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
-              ) : team.length === 0 ? (
+              ) : teamMembers.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No team members yet. Invite staff above.</p>
               ) : (
-                <div className="space-y-4">
-                  {/* Admins */}
-                  {admins.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Admins</p>
-                      <div className="space-y-2">
-                        {admins.map(member => renderTeamMember(member, "bg-primary/10 text-primary"))}
+                <div className="space-y-5">
+                  {(["admin", "doctor", "receptionist"] as const).map(role => {
+                    const members = grouped[role];
+                    if (members.length === 0) return null;
+                    return (
+                      <div key={role}>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                          {role === "admin" ? "Admins" : role === "doctor" ? "Doctors" : "Receptionists"}
+                        </p>
+                        <div className="space-y-2">
+                          {members.map(member => (
+                            <div key={member.user_id} className="flex items-center justify-between rounded-xl bg-muted/30 p-3">
+                              <div className="flex items-center gap-3">
+                                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 font-display text-sm font-bold text-primary">
+                                  {(member.display_name || "?").charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <p className="font-medium text-foreground text-sm">{member.display_name}</p>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <Badge className={`capitalize text-xs ${roleBadgeClass[member.role] || ""} border-0`}>{member.role}</Badge>
+                                    {member.qualification && <span className="text-xs text-muted-foreground">{member.qualification}</span>}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="sm" onClick={() => openEditPanel(member)}>
+                                  <Pencil className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                                {member.user_id !== user?.id && (
+                                  <Button
+                                    variant="ghost" size="sm"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => handleRemoveStaff(member.user_id, member.display_name)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  {/* Doctors */}
-                  {doctors.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Doctors</p>
-                      <div className="space-y-2">
-                        {doctors.map(member => renderTeamMember(member, "bg-info/10 text-info"))}
-                      </div>
-                    </div>
-                  )}
-                  {/* Receptionists */}
-                  {receptionists.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Receptionists</p>
-                      <div className="space-y-2">
-                        {receptionists.map(member => renderTeamMember(member, "bg-warning/10 text-warning"))}
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -361,32 +443,40 @@ export default function Settings() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit Member Sheet */}
+      <Sheet open={editOpen} onOpenChange={setEditOpen}>
+        <SheetContent className="sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Edit {editMember?.role === "doctor" ? "Doctor" : "Staff Member"}</SheetTitle>
+          </SheetHeader>
+          <div className="space-y-4 mt-6">
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input value={editName} onChange={e => setEditName(e.target.value)} className="rounded-lg" />
+            </div>
+            {editMember?.role === "doctor" && (
+              <>
+                <div className="space-y-2">
+                  <Label>Qualification</Label>
+                  <Input value={editQualification} onChange={e => setEditQualification(e.target.value)} placeholder="MBBS, MD" className="rounded-lg" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Specialty</Label>
+                  <Input value={editSpecialty} onChange={e => setEditSpecialty(e.target.value)} placeholder="General Medicine" className="rounded-lg" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Registration Number</Label>
+                  <Input value={editRegNumber} onChange={e => setEditRegNumber(e.target.value)} placeholder="MCI-123456" className="rounded-lg" />
+                </div>
+              </>
+            )}
+            <Button onClick={handleSaveEdit} disabled={editSaving} className="w-full rounded-lg">
+              <Save className="mr-2 h-4 w-4" /> {editSaving ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </DashboardLayout>
   );
-
-  function renderTeamMember(member: any, badgeClass: string) {
-    return (
-      <div key={member.user_id} className="flex items-center justify-between rounded-xl bg-muted/30 p-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 font-display text-sm font-bold text-primary">
-            {(member.full_name || "?").charAt(0).toUpperCase()}
-          </div>
-          <div>
-            <p className="font-medium text-foreground text-sm">{member.full_name || "Unnamed"}</p>
-            <Badge className={`capitalize text-xs mt-0.5 ${badgeClass} border-0`}>{member.role}</Badge>
-          </div>
-        </div>
-        {member.user_id !== user?.id && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-destructive hover:text-destructive"
-            onClick={() => handleRemoveStaff(member.user_id, member.full_name)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
-    );
-  }
 }
