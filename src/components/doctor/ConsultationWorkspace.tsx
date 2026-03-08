@@ -204,8 +204,7 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
     }
     setSaving(true);
     try {
-      const { data: doctorRow } = await supabase
-        .from("doctors").select("id").eq("user_id", profile!.user_id).single();
+      const doctorRow = await getDoctorForUser(profile!.user_id, profile!.clinic_id!);
       if (!doctorRow) throw new Error("Doctor profile not found");
 
       const soapNotes = buildSoapNotes();
