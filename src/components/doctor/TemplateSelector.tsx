@@ -12,11 +12,13 @@ type Template = {
 
 type Props = {
   clinicId: string;
+  doctorId: string;
   doctorDefaultTemplateId: string | null;
+  enabledTemplateNames: string[];
   onTemplateChange: (template: Template | null) => void;
 };
 
-export default function TemplateSelector({ clinicId, doctorDefaultTemplateId, onTemplateChange }: Props) {
+export default function TemplateSelector({ clinicId, doctorId, doctorDefaultTemplateId, enabledTemplateNames, onTemplateChange }: Props) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
 
@@ -26,23 +28,32 @@ export default function TemplateSelector({ clinicId, doctorDefaultTemplateId, on
         .from("note_templates")
         .select("id, name, description, sections")
         .or(`is_system.eq.true,clinic_id.eq.${clinicId}`)
-        .order("is_system", { ascending: false });
+        .order("name");
       if (data) {
-        const parsed = data.map((t: any) => ({
+        const allTemplates = data.map((t: any) => ({
           ...t,
           sections: Array.isArray(t.sections) ? t.sections : [],
         }));
-        setTemplates(parsed);
-        // Auto-select doctor's default or first SOAP
-        const defaultId = doctorDefaultTemplateId || parsed.find((t: any) => t.name === "SOAP Notes")?.id;
-        if (defaultId) {
-          setSelectedId(defaultId);
-          onTemplateChange(parsed.find((t: any) => t.id === defaultId) || null);
+        // Filter to only doctor's enabled templates
+        const enabled = enabledTemplateNames.length > 0
+          ? allTemplates.filter(t => enabledTemplateNames.includes(t.name))
+          : allTemplates.filter(t => t.name === "SOAP Notes");
+        
+        setTemplates(enabled);
+
+        // Auto-select: doctor's default first, then first enabled
+        const defaultTemplate = doctorDefaultTemplateId
+          ? enabled.find(t => t.id === doctorDefaultTemplateId)
+          : null;
+        const initial = defaultTemplate || enabled[0] || null;
+        if (initial) {
+          setSelectedId(initial.id);
+          onTemplateChange(initial);
         }
       }
     };
     fetch();
-  }, [clinicId]);
+  }, [clinicId, enabledTemplateNames.join(",")]);
 
   const handleChange = (id: string) => {
     setSelectedId(id);
