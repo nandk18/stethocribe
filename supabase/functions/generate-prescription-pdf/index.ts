@@ -7,6 +7,22 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 }
 
+// Romanized transliterations that work with standard PDF fonts
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  Tamil: { clinic: "Maruthuvamanai", doctor: "Maruthvar", patient: "Noyaali", date: "Thethi", rx: "Marunthu Seettu", followUp: "Maru Santhippu", morning: "Kaalai", afternoon: "Mathiyam", evening: "Maalai", night: "Iravu", investigations: "Parisodhanaikal", soap: "Maruthva Kurippukal" },
+  Hindi: { clinic: "Aspatal", doctor: "Doctor", patient: "Mariz", date: "Tarikh", rx: "Nuskha", followUp: "Agli Mulakat", morning: "Subah", afternoon: "Dopahar", evening: "Shaam", night: "Raat", investigations: "Jaanch", soap: "Chikitsa Notes" },
+  Telugu: { clinic: "Asupathri", doctor: "Vaidyudu", patient: "Rogi", date: "Thedhi", rx: "Prescription", followUp: "Thaduparthi Visit", morning: "Udayam", afternoon: "Madhyahnam", evening: "Sayanthram", night: "Rathri", investigations: "Parikshalu", soap: "Vaidya Notes" },
+  Kannada: { clinic: "Aspathre", doctor: "Vaidyaru", patient: "Rogi", date: "Dinanka", rx: "Prescription", followUp: "Mundina Bheti", morning: "Beligere", afternoon: "Madhyahna", evening: "Sanje", night: "Rathri", investigations: "Tapaasanegalu", soap: "Vaidyakiya Notes" },
+  Malayalam: { clinic: "Aashupathri", doctor: "Doctor", patient: "Rogi", date: "Theeyathi", rx: "Kurippadhi", followUp: "Aduththa Sandarshanam", morning: "Raavile", afternoon: "Uchaykku", evening: "Vaikunneeram", night: "Raathri", investigations: "Parishodhankal", soap: "Clinical Kurippukal" },
+  Marathi: { clinic: "Rugnalay", doctor: "Doctor", patient: "Rugna", date: "Tarikh", rx: "Prescription", followUp: "Pudhili Bhet", morning: "Sakaali", afternoon: "Dupari", evening: "Sandhyakaali", night: "Raatri", investigations: "Tapasnya", soap: "Vaidyakiya Nondi" },
+  Bengali: { clinic: "Haspataal", doctor: "Daktar", patient: "Rogi", date: "Tarikh", rx: "Prescription", followUp: "Poroborti Sakkhat", morning: "Sokal", afternoon: "Dupur", evening: "Bikel", night: "Raat", investigations: "Poriksha", soap: "Clinical Note" },
+  Gujarati: { clinic: "Hospital", doctor: "Doctor", patient: "Dardi", date: "Tarikh", rx: "Prescription", followUp: "Aagli Mulakat", morning: "Savar", afternoon: "Bapor", evening: "Saanj", night: "Raat", investigations: "Tapaas", soap: "Tabeebi Nondh" },
+  Punjabi: { clinic: "Haspataal", doctor: "Daktar", patient: "Mariz", date: "Tarikh", rx: "Nuskha", followUp: "Agli Mulakat", morning: "Savere", afternoon: "Dupehar", evening: "Shaam", night: "Raat", investigations: "Jaanch", soap: "Clinical Notes" },
+  Odia: { clinic: "Daktarkhana", doctor: "Daktar", patient: "Rogi", date: "Tarikh", rx: "Prescription", followUp: "Parabarti Bhet", morning: "Sakala", afternoon: "Diprahar", evening: "Sandhya", night: "Ratri", investigations: "Pariksha", soap: "Chikitsa Note" },
+  Assamese: { clinic: "Chikitsalay", doctor: "Chikitsok", patient: "Rogi", date: "Tarikh", rx: "Prescription", followUp: "Poroborti Sakkhat", morning: "Puwa", afternoon: "Duporiya", evening: "Abeli", night: "Rati", investigations: "Poriksha", soap: "Chikitsa Toka" },
+  Urdu: { clinic: "Aspatal", doctor: "Doctor", patient: "Mariz", date: "Tarikh", rx: "Nuskha", followUp: "Agli Mulaqat", morning: "Subah", afternoon: "Dopehar", evening: "Shaam", night: "Raat", investigations: "Test", soap: "Tibbi Notes" },
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders })
 
@@ -45,7 +61,8 @@ serve(async (req) => {
     const investigations = (prescription.investigations || []) as string[]
 
     const lang = clinic?.regional_language || null
-    console.log("Regional language:", lang)
+    const t = lang && TRANSLATIONS[lang] ? TRANSLATIONS[lang] : null
+    console.log("Regional language:", lang, "Has translations:", !!t)
 
     const getAge = (dob: string) => dob
       ? String(Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000)))
@@ -58,11 +75,14 @@ serve(async (req) => {
 
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
     const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica)
+    const fontItalic = await pdfDoc.embedFont(StandardFonts.HelveticaOblique)
 
     const teal = rgb(0.051, 0.431, 0.431)
     const dark = rgb(0.1, 0.1, 0.1)
     const gray = rgb(0.4, 0.4, 0.4)
     const white = rgb(1, 1, 1)
+    const lightTeal = rgb(0.941, 0.980, 0.980)
+    const headerBg = rgb(0.035, 0.271, 0.271)
 
     let y = height - 30
     const left = 40
@@ -70,7 +90,6 @@ serve(async (req) => {
     const lineH = 16
 
     const drawText = (text: string, x: number, yPos: number, size = 10, font = fontRegular, color = dark) => {
-      // Filter non-ASCII characters that pdf-lib can't render with standard fonts
       const safe = String(text || "").replace(/[^\x20-\x7E]/g, "")
       if (!safe) return
       try { page.drawText(safe, { x, y: yPos, size, font, color }) } catch {}
@@ -80,45 +99,56 @@ serve(async (req) => {
       page.drawLine({ start: { x: left, y: yPos }, end: { x: right, y: yPos }, thickness, color })
     }
 
-    const drawRect = (x: number, yPos: number, w: number, h: number, color = rgb(0.941, 0.980, 0.980)) => {
+    const drawRect = (x: number, yPos: number, w: number, h: number, color = lightTeal) => {
       page.drawRectangle({ x, y: yPos - h, width: w, height: h, color })
     }
 
     const truncate = (str: string, max: number) =>
       str && str.length > max ? str.substring(0, max) + "..." : str || ""
 
-    // -- HEADER --
-    drawRect(left, y + 10, right - left, 60, rgb(0.035, 0.271, 0.271))
+    // -- HEADER BACKGROUND --
+    const headerH = t ? 70 : 60
+    drawRect(left, y + 10, right - left, headerH, headerBg)
 
+    // Clinic name + transliterated subtitle
     drawText(clinic?.name || "Clinic", left + 10, y - 5, 18, fontBold, white)
-    drawText(clinic?.address || "", left + 10, y - 22, 8, fontRegular, rgb(0.8, 0.9, 0.9))
-    drawText(clinic?.phone ? "Tel: " + clinic.phone : "", left + 10, y - 33, 8, fontRegular, rgb(0.8, 0.9, 0.9))
-    if (lang) drawText("Language: " + lang, left + 10, y - 44, 7, fontRegular, rgb(0.6, 0.85, 0.85))
+    if (t) {
+      drawText("(" + t.clinic + ")", left + 10, y - 20, 9, fontItalic, rgb(0.7, 0.9, 0.9))
+    }
+    const addrY = t ? y - 33 : y - 22
+    drawText(clinic?.address || "", left + 10, addrY, 8, fontRegular, rgb(0.8, 0.9, 0.9))
+    drawText(clinic?.phone ? "Tel: " + clinic.phone : "", left + 10, addrY - 11, 8, fontRegular, rgb(0.8, 0.9, 0.9))
 
+    // Doctor block right side
     const drName = doctor?.name || "Doctor"
     const drNameW = fontBold.widthOfTextAtSize(drName, 12)
     drawText(drName, right - drNameW - 10, y - 5, 12, fontBold, white)
+    if (t) {
+      const drSub = "(" + t.doctor + ")"
+      const drSubW = fontItalic.widthOfTextAtSize(drSub, 9)
+      drawText(drSub, right - drSubW - 10, y - 18, 9, fontItalic, rgb(0.7, 0.9, 0.9))
+    }
+    const drDetailY = t ? y - 30 : y - 19
     const drQual = doctor?.qualification || ""
-    const drQualW = fontRegular.widthOfTextAtSize(drQual, 8)
-    drawText(drQual, right - drQualW - 10, y - 19, 8, fontRegular, rgb(0.8, 0.9, 0.9))
+    drawText(drQual, right - fontRegular.widthOfTextAtSize(drQual, 8) - 10, drDetailY, 8, fontRegular, rgb(0.8, 0.9, 0.9))
     const drReg = doctor?.registration_number ? "Reg: " + doctor.registration_number : ""
-    const drRegW = fontRegular.widthOfTextAtSize(drReg, 8)
-    drawText(drReg, right - drRegW - 10, y - 30, 8, fontRegular, rgb(0.8, 0.9, 0.9))
+    drawText(drReg, right - fontRegular.widthOfTextAtSize(drReg, 8) - 10, drDetailY - 11, 8, fontRegular, rgb(0.8, 0.9, 0.9))
     const drSpec = doctor?.specialty || ""
-    const drSpecW = fontRegular.widthOfTextAtSize(drSpec, 8)
-    drawText(drSpec, right - drSpecW - 10, y - 41, 8, fontRegular, rgb(0.8, 0.9, 0.9))
+    drawText(drSpec, right - fontRegular.widthOfTextAtSize(drSpec, 8) - 10, drDetailY - 22, 8, fontRegular, rgb(0.8, 0.9, 0.9))
 
-    y -= 70
+    y -= (headerH + 10)
 
     // -- PATIENT BAR --
-    page.drawRectangle({ x: left, y: y - 36, width: right - left, height: 40, borderColor: teal, borderWidth: 0.5, color: rgb(0.941, 0.980, 0.980) })
+    page.drawRectangle({ x: left, y: y - 36, width: right - left, height: 40, borderColor: teal, borderWidth: 0.5, color: lightTeal })
 
     const colW = (right - left) / 4
+    const patLabel = t ? t.patient + " / Patient" : "Patient"
+    const dateLabel = t ? t.date + " / Date" : "Date"
     const fields: [string, string][] = [
-      ["Patient", patient?.name || "—"],
+      [patLabel, patient?.name || "—"],
       ["Healthcare ID", patient?.healthcare_id || "—"],
       ["Age / Gender", `${getAge(patient?.dob)}y / ${patient?.gender || "—"}`],
-      ["Date", new Date().toLocaleDateString("en-IN")],
+      [dateLabel, new Date().toLocaleDateString("en-IN")],
     ]
     fields.forEach(([label, value], i) => {
       const x = left + 8 + i * colW
@@ -150,6 +180,7 @@ serve(async (req) => {
         page.drawRectangle({ x: vx, y: y - 12, width: vw, height: 16, color: rgb(0.96, 0.99, 0.99), borderColor: teal, borderWidth: 0.4 })
         drawText(v, vx + 6, y - 4, 9, fontRegular, dark)
         vx += vw + 6
+        if (vx > right - 60) { vx = left; y -= 20 }
       })
       y -= 26
     }
@@ -166,7 +197,8 @@ serve(async (req) => {
 
     // -- SOAP NOTES --
     if (soap.assessment || soap.subjective) {
-      drawText("CLINICAL NOTES (SOAP)", left, y, 8, fontBold, teal)
+      const soapLabel = t ? t.soap + " / CLINICAL NOTES (SOAP)" : "CLINICAL NOTES (SOAP)"
+      drawText(soapLabel, left, y, 8, fontBold, teal)
       y -= 4
       drawLine(y, teal, 0.5)
       y -= 14
@@ -201,21 +233,28 @@ serve(async (req) => {
       y -= 6
     }
 
-    // -- MEDICATIONS WITH TIMING --
+    // -- MEDICATIONS WITH TIMING COLUMNS --
     if (meds.length > 0) {
-      drawText("Rx  PRESCRIPTION", left, y, 10, fontBold, teal)
+      const rxLabel = t ? t.rx + " / Rx PRESCRIPTION" : "Rx PRESCRIPTION"
+      drawText(rxLabel, left, y, 10, fontBold, teal)
       y -= 4
       drawLine(y, teal, 1)
       y -= 6
 
       // Columns: #, Drug, Dosage, M, A, E, N, Duration
-      const cw = [22, 110, 55, 35, 35, 35, 35, 60]
+      const cw = [22, 110, 55, 38, 38, 38, 38, 55]
       const cx = [left]
       cw.forEach((w, i) => cx.push(cx[i] + w))
-      const headers = ["#", "Drug", "Dosage", "M", "A", "E", "N", "Duration"]
+
+      // Header labels with transliterated timing
+      const mHead = t ? "M (" + t.morning.substring(0, 4) + ")" : "M"
+      const aHead = t ? "A (" + t.afternoon.substring(0, 4) + ")" : "A"
+      const eHead = t ? "E (" + t.evening.substring(0, 4) + ")" : "E"
+      const nHead = t ? "N (" + t.night.substring(0, 4) + ")" : "N"
+      const headers = ["#", "Drug / Medicine", "Dosage", mHead, aHead, eHead, nHead, "Duration"]
 
       drawRect(left, y + 4, right - left, 18, teal)
-      headers.forEach((h, i) => drawText(h, cx[i] + 3, y - 6, 7, fontBold, white))
+      headers.forEach((h, i) => drawText(h, cx[i] + 2, y - 6, 7, fontBold, white))
       y -= 20
 
       meds.forEach((m: any, idx: number) => {
@@ -231,9 +270,9 @@ serve(async (req) => {
           m.duration || "—"
         ]
         row.forEach((val, i) => {
-          drawText(truncate(val, i === 1 ? 18 : 14), cx[i] + 3, y - 4, 9,
+          drawText(truncate(val, i === 1 ? 18 : 14), cx[i] + 2, y - 4, 9,
             i === 1 ? fontBold : fontRegular,
-            [3,4,5,6].includes(i) && val === "Y" ? teal : dark)
+            [3, 4, 5, 6].includes(i) && val === "Y" ? teal : dark)
         })
         y -= 16
       })
@@ -242,7 +281,8 @@ serve(async (req) => {
 
     // -- INVESTIGATIONS --
     if (investigations.length > 0) {
-      drawText("INVESTIGATIONS ADVISED", left, y, 8, fontBold, teal)
+      const invLabel = t ? t.investigations + " / INVESTIGATIONS" : "INVESTIGATIONS"
+      drawText(invLabel, left, y, 8, fontBold, teal)
       y -= 4
       drawLine(y, teal, 0.5)
       y -= 14
@@ -252,8 +292,9 @@ serve(async (req) => {
 
     // -- FOLLOW UP --
     if (prescription.follow_up_date) {
+      const fuLabel = t ? t.followUp + " / Follow-up" : "Follow-up"
       page.drawRectangle({ x: left, y: y - 16, width: right - left, height: 20, borderColor: rgb(0.99, 0.83, 0.2), borderWidth: 0.5, color: rgb(1, 0.99, 0.88) })
-      drawText("Follow-up: " + new Date(prescription.follow_up_date).toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" }), left + 8, y - 4, 10, fontBold, rgb(0.5, 0.35, 0))
+      drawText(fuLabel + ": " + new Date(prescription.follow_up_date).toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" }), left + 8, y - 4, 10, fontBold, rgb(0.5, 0.35, 0))
       y -= 28
     }
 
@@ -271,6 +312,11 @@ serve(async (req) => {
     const dateStr = new Date().toLocaleString("en-IN")
     const dateW = fontRegular.widthOfTextAtSize(dateStr, 8)
     drawText(dateStr, right - dateW, 38, 8, fontRegular, gray)
+
+    // -- LANGUAGE TAG --
+    if (t && lang) {
+      drawText("Language: " + lang, left + 180, 38, 7, fontItalic, gray)
+    }
 
     // Serialize PDF
     const pdfBytes = await pdfDoc.save()
