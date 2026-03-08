@@ -15,7 +15,18 @@ function PrescriptionLinkButton({ pdfUrl }: { pdfUrl: string }) {
     setLoading(true);
     try {
       const { data } = await supabase.storage.from("prescriptions").createSignedUrl(pdfUrl, 600);
-      if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+      if (data?.signedUrl) {
+        if (pdfUrl.endsWith(".html")) {
+          // Fetch HTML content and open via blob URL to bypass Supabase CSP sandbox
+          const res = await fetch(data.signedUrl);
+          const html = await res.text();
+          const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+          const blobUrl = URL.createObjectURL(blob);
+          window.open(blobUrl, "_blank");
+        } else {
+          window.open(data.signedUrl, "_blank");
+        }
+      }
     } catch {} finally { setLoading(false); }
   };
   return (
