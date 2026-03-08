@@ -92,10 +92,10 @@ export default function TemplatesPage() {
     const { error } = await supabase
       .from("doctors")
       .update({ enabled_templates: updated } as any)
-      .eq("id", doctor.id);
+      .eq("id", doctorRecord.id);
     if (error) {
       toast.error("Failed to update templates");
-      fetchDoctorTemplates();
+      fetchDoctorTemplates(doctorRecord.id);
     }
   };
 

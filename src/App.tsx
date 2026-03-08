@@ -84,7 +84,7 @@ function AppRoutes() {
 
   // Role-based dashboard
   const role = profile?.role;
-  const DashboardComponent = role === "receptionist" ? ReceptionistDashboard : role === "doctor" ? DoctorDashboard : AdminDashboard;
+  const DashboardComponent = role === "receptionist" ? ReceptionistDashboard : (role === "doctor" || role === "admin") ? DoctorDashboard : AdminDashboard;
 
   return (
     <Routes>

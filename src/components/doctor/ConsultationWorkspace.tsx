@@ -129,16 +129,22 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
   const [enabledTemplateNames, setEnabledTemplateNames] = useState<string[]>(["SOAP Notes"]);
 
   useEffect(() => {
-    if (doctor) {
-      // Fetch enabled templates from doctors table
-      supabase.from("doctors").select("enabled_templates").eq("id", doctor.id).single()
-        .then(({ data }) => {
-          if (data?.enabled_templates && Array.isArray(data.enabled_templates)) {
-            setEnabledTemplateNames(data.enabled_templates as string[]);
-          }
-        });
-    }
-  }, [doctor]);
+    const fetchTemplates = async () => {
+      if (doctor) {
+        const { data } = await supabase.from("doctors").select("enabled_templates").eq("id", doctor.id).single();
+        if (data?.enabled_templates && Array.isArray(data.enabled_templates)) {
+          setEnabledTemplateNames(data.enabled_templates as string[]);
+        }
+      } else if (profile?.role === "admin" && profile?.user_id && profile?.clinic_id) {
+        // Admin without doctor record - try to find or auto-create
+        const dr = await getDoctorForUser(profile.user_id, profile.clinic_id);
+        if (dr?.enabled_templates && Array.isArray(dr.enabled_templates)) {
+          setEnabledTemplateNames(dr.enabled_templates as string[]);
+        }
+      }
+    };
+    fetchTemplates();
+  }, [doctor, profile?.role, profile?.user_id, profile?.clinic_id]);
 
   // Prescription
   const [medications, setMedications] = useState<Medication[]>([
