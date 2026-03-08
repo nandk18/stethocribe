@@ -70,18 +70,46 @@ export default function PrescriptionShareModal({ open, onClose, prescriptionPdfU
     }
   };
 
-  const handleDownload = () => {
-    if (!signedUrl) return;
-    const a = document.createElement("a");
-    a.href = signedUrl;
-    a.download = `prescription-${patient?.name}-${new Date().toLocaleDateString("en-IN").replace(/\//g, "-")}.html`;
-    a.target = "_blank";
-    a.click();
+  const openHtmlAsBlobUrl = async (url: string): Promise<string | null> => {
+    try {
+      const res = await fetch(url);
+      const html = await res.text();
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      return URL.createObjectURL(blob);
+    } catch {
+      return null;
+    }
   };
 
-  const handlePrint = () => {
+  const isHtml = prescriptionPdfUrl?.endsWith(".html");
+
+  const handleDownload = async () => {
     if (!signedUrl) return;
-    window.open(signedUrl, "_blank");
+    if (isHtml) {
+      const blobUrl = await openHtmlAsBlobUrl(signedUrl);
+      if (blobUrl) {
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = `prescription-${patient?.name}-${new Date().toLocaleDateString("en-IN").replace(/\//g, "-")}.html`;
+        a.click();
+      }
+    } else {
+      const a = document.createElement("a");
+      a.href = signedUrl;
+      a.download = `prescription-${patient?.name}-${new Date().toLocaleDateString("en-IN").replace(/\//g, "-")}.pdf`;
+      a.target = "_blank";
+      a.click();
+    }
+  };
+
+  const handlePrint = async () => {
+    if (!signedUrl) return;
+    if (isHtml) {
+      const blobUrl = await openHtmlAsBlobUrl(signedUrl);
+      if (blobUrl) window.open(blobUrl, "_blank");
+    } else {
+      window.open(signedUrl, "_blank");
+    }
   };
 
   const content = (
