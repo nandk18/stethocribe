@@ -1,29 +1,52 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 }
 
-// Romanized transliterations that work with standard PDF fonts
 const TRANSLATIONS: Record<string, Record<string, string>> = {
-  Tamil: { clinic: "Maruthuvamanai", doctor: "Maruthvar", patient: "Noyaali", date: "Thethi", rx: "Marunthu Seettu", followUp: "Maru Santhippu", morning: "Kaalai", afternoon: "Mathiyam", evening: "Maalai", night: "Iravu", investigations: "Parisodhanaikal", soap: "Maruthva Kurippukal" },
-  Hindi: { clinic: "Aspatal", doctor: "Doctor", patient: "Mariz", date: "Tarikh", rx: "Nuskha", followUp: "Agli Mulakat", morning: "Subah", afternoon: "Dopahar", evening: "Shaam", night: "Raat", investigations: "Jaanch", soap: "Chikitsa Notes" },
-  Telugu: { clinic: "Asupathri", doctor: "Vaidyudu", patient: "Rogi", date: "Thedhi", rx: "Prescription", followUp: "Thaduparthi Visit", morning: "Udayam", afternoon: "Madhyahnam", evening: "Sayanthram", night: "Rathri", investigations: "Parikshalu", soap: "Vaidya Notes" },
-  Kannada: { clinic: "Aspathre", doctor: "Vaidyaru", patient: "Rogi", date: "Dinanka", rx: "Prescription", followUp: "Mundina Bheti", morning: "Beligere", afternoon: "Madhyahna", evening: "Sanje", night: "Rathri", investigations: "Tapaasanegalu", soap: "Vaidyakiya Notes" },
-  Malayalam: { clinic: "Aashupathri", doctor: "Doctor", patient: "Rogi", date: "Theeyathi", rx: "Kurippadhi", followUp: "Aduththa Sandarshanam", morning: "Raavile", afternoon: "Uchaykku", evening: "Vaikunneeram", night: "Raathri", investigations: "Parishodhankal", soap: "Clinical Kurippukal" },
-  Marathi: { clinic: "Rugnalay", doctor: "Doctor", patient: "Rugna", date: "Tarikh", rx: "Prescription", followUp: "Pudhili Bhet", morning: "Sakaali", afternoon: "Dupari", evening: "Sandhyakaali", night: "Raatri", investigations: "Tapasnya", soap: "Vaidyakiya Nondi" },
-  Bengali: { clinic: "Haspataal", doctor: "Daktar", patient: "Rogi", date: "Tarikh", rx: "Prescription", followUp: "Poroborti Sakkhat", morning: "Sokal", afternoon: "Dupur", evening: "Bikel", night: "Raat", investigations: "Poriksha", soap: "Clinical Note" },
-  Gujarati: { clinic: "Hospital", doctor: "Doctor", patient: "Dardi", date: "Tarikh", rx: "Prescription", followUp: "Aagli Mulakat", morning: "Savar", afternoon: "Bapor", evening: "Saanj", night: "Raat", investigations: "Tapaas", soap: "Tabeebi Nondh" },
-  Punjabi: { clinic: "Haspataal", doctor: "Daktar", patient: "Mariz", date: "Tarikh", rx: "Nuskha", followUp: "Agli Mulakat", morning: "Savere", afternoon: "Dupehar", evening: "Shaam", night: "Raat", investigations: "Jaanch", soap: "Clinical Notes" },
-  Odia: { clinic: "Daktarkhana", doctor: "Daktar", patient: "Rogi", date: "Tarikh", rx: "Prescription", followUp: "Parabarti Bhet", morning: "Sakala", afternoon: "Diprahar", evening: "Sandhya", night: "Ratri", investigations: "Pariksha", soap: "Chikitsa Note" },
-  Assamese: { clinic: "Chikitsalay", doctor: "Chikitsok", patient: "Rogi", date: "Tarikh", rx: "Prescription", followUp: "Poroborti Sakkhat", morning: "Puwa", afternoon: "Duporiya", evening: "Abeli", night: "Rati", investigations: "Poriksha", soap: "Chikitsa Toka" },
-  Urdu: { clinic: "Aspatal", doctor: "Doctor", patient: "Mariz", date: "Tarikh", rx: "Nuskha", followUp: "Agli Mulaqat", morning: "Subah", afternoon: "Dopehar", evening: "Shaam", night: "Raat", investigations: "Test", soap: "Tibbi Notes" },
-  Konkani: { clinic: "Hospital", doctor: "Doctor", patient: "Dukhi", date: "Tarikh", rx: "Prescription", followUp: "Fudli Bhet", morning: "Sokallim", afternoon: "Donparam", evening: "Sanjechim", night: "Ratim", investigations: "Tapaasni", soap: "Clinical Note" },
-  Manipuri: { clinic: "Hospital", doctor: "Doctor", patient: "Laina Leibak", date: "Tarik", rx: "Prescription", followUp: "Ahing Taba", morning: "Nungaiba", afternoon: "Nungthil", evening: "Numidang", night: "Ahan", investigations: "Test", soap: "Clinical Note" },
-  Sindhi: { clinic: "Aspatal", doctor: "Doctor", patient: "Mariz", date: "Tarikh", rx: "Nuskha", followUp: "Agli Mulaqat", morning: "Subho", afternoon: "Biapahri", evening: "Shaam", night: "Raat", investigations: "Jaanch", soap: "Tibbi Notes" },
+  Tamil: { clinic: "மருத்துவமனை", doctor: "மருத்துவர்", patient: "நோயாளி", date: "தேதி", rx: "மருந்து சீட்டு", followUp: "மறு சந்திப்பு", morning: "காலை", afternoon: "மதியம்", evening: "மாலை", night: "இரவு", investigations: "பரிசோதனைகள்", soap: "மருத்துவ குறிப்புகள்" },
+  Hindi: { clinic: "अस्पताल", doctor: "डॉक्टर", patient: "मरीज़", date: "तारीख", rx: "नुस्खा", followUp: "अगली मुलाकात", morning: "सुबह", afternoon: "दोपहर", evening: "शाम", night: "रात", investigations: "जाँच", soap: "नैदानिक नोट्स" },
+  Telugu: { clinic: "ఆసుపత్రి", doctor: "వైద్యుడు", patient: "రోగి", date: "తేదీ", rx: "ప్రిస్క్రిప్షన్", followUp: "తదుపరి సందర్శన", morning: "ఉదయం", afternoon: "మధ్యాహ్నం", evening: "సాయంత్రం", night: "రాత్రి", investigations: "పరీక్షలు", soap: "వైద్య నోట్స్" },
+  Kannada: { clinic: "ಆಸ್ಪತ್ರೆ", doctor: "ವೈದ್ಯರು", patient: "ರೋಗಿ", date: "ದಿನಾಂಕ", rx: "ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್", followUp: "ಮುಂದಿನ ಭೇಟಿ", morning: "ಬೆಳಿಗ್ಗೆ", afternoon: "ಮಧ್ಯಾಹ್ನ", evening: "ಸಂಜೆ", night: "ರಾತ್ರಿ", investigations: "ತಪಾಸಣೆಗಳು", soap: "ವೈದ್ಯಕೀಯ ಟಿಪ್ಪಣಿಗಳು" },
+  Malayalam: { clinic: "ആശുപത്രി", doctor: "ഡോക്ടർ", patient: "രോഗി", date: "തീയതി", rx: "കുറിപ്പടി", followUp: "അടുത്ത സന്ദർശനം", morning: "രാവിലെ", afternoon: "ഉച്ചയ്ക്ക്", evening: "വൈകുന്നേരം", night: "രാത്രി", investigations: "പരിശോധനകൾ", soap: "ക്ലിനിക്കൽ കുറിപ്പുകൾ" },
+  Marathi: { clinic: "रुग्णालय", doctor: "डॉक्टर", patient: "रुग्ण", date: "तारीख", rx: "प्रिस्क्रिप्शन", followUp: "पुढील भेट", morning: "सकाळ", afternoon: "दुपार", evening: "संध्याकाळ", night: "रात्र", investigations: "तपासण्या", soap: "वैद्यकीय नोंदी" },
+  Bengali: { clinic: "হাসপাতাল", doctor: "ডাক্তার", patient: "রোগী", date: "তারিখ", rx: "প্রেসক্রিপশন", followUp: "পরবর্তী সাক্ষাৎ", morning: "সকাল", afternoon: "দুপুর", evening: "বিকেল", night: "রাত", investigations: "পরীক্ষা", soap: "ক্লিনিকাল নোট" },
+  Gujarati: { clinic: "હોસ્પિટલ", doctor: "ડૉક્ટર", patient: "દર્દી", date: "તારીખ", rx: "પ્રિસ્ક્રિપ્શન", followUp: "આગળની મુલાકાત", morning: "સવાર", afternoon: "બપોર", evening: "સાંજ", night: "રાત", investigations: "તપાસ", soap: "તબીબી નોંધ" },
+  Punjabi: { clinic: "ਹਸਪਤਾਲ", doctor: "ਡਾਕਟਰ", patient: "ਮਰੀਜ਼", date: "ਤਾਰੀਖ", rx: "ਨੁਸਖ਼ਾ", followUp: "ਅਗਲੀ ਮੁਲਾਕਾਤ", morning: "ਸਵੇਰ", afternoon: "ਦੁਪਹਿਰ", evening: "ਸ਼ਾਮ", night: "ਰਾਤ", investigations: "ਜਾਂਚ", soap: "ਕਲੀਨਿਕਲ ਨੋਟਸ" },
+  Odia: { clinic: "ଡାକ୍ତରଖାନା", doctor: "ଡାକ୍ତର", patient: "ରୋଗୀ", date: "ତାରିଖ", rx: "ପ୍ରେସକ୍ରିପସନ", followUp: "ପରବର୍ତ୍ତୀ ଭେଟ", morning: "ସକାଳ", afternoon: "ଦ୍ୱିପ୍ରହର", evening: "ସନ୍ଧ୍ୟା", night: "ରାତ୍ରି", investigations: "ପରୀକ୍ଷା", soap: "ଚିକିତ୍ସା ଟିପ୍ପଣୀ" },
+  Assamese: { clinic: "চিকিৎসালয়", doctor: "চিকিৎসক", patient: "ৰোগী", date: "তাৰিখ", rx: "প্ৰেছক্ৰিপচন", followUp: "পৰৱৰ্তী সাক্ষাৎ", morning: "পুৱা", afternoon: "দুপৰীয়া", evening: "আবেলি", night: "ৰাতি", investigations: "পৰীক্ষা", soap: "চিকিৎসা টোকা" },
+  Urdu: { clinic: "اسپتال", doctor: "ڈاکٹر", patient: "مریض", date: "تاریخ", rx: "نسخہ", followUp: "اگلی ملاقات", morning: "صبح", afternoon: "دوپہر", evening: "شام", night: "رات", investigations: "ٹیسٹ", soap: "طبی نوٹس" },
+  Konkani: { clinic: "दवाखानो", doctor: "दोतोर", patient: "रोगी", date: "तारीख", rx: "औषध चिट्ठी", followUp: "फुडली भेट", morning: "सकाळ", afternoon: "दनपार", evening: "सांज", night: "रात", investigations: "तपासणी", soap: "वैद्यकीय नोंद" },
+  Manipuri: { clinic: "ওষুধালয়", doctor: "ডাক্তর", patient: "নাকল", date: "নুমিৎ", rx: "ওষুধ চিরকুট", followUp: "মতম ফাওবা", morning: "নুমিৎ থোকপা", afternoon: "নুমিদাং", evening: "নুমিৎ তকপা", night: "খরাং", investigations: "পরীক্ষা", soap: "ডাক্তরি নোট" },
+  Sindhi: { clinic: "دواخانو", doctor: "ڊاڪٽر", patient: "مريض", date: "تاريخ", rx: "نسخو", followUp: "اڳيون ملاقات", morning: "صبح", afternoon: "منجهند", evening: "شام", night: "رات", investigations: "جاچ", soap: "طبي نوٽ" },
+}
+
+const transliterateWithClaude = async (text: string, language: string, apiKey: string): Promise<string> => {
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 150,
+        messages: [{
+          role: "user",
+          content: `Transliterate the name "${text}" into ${language} script. Return ONLY the ${language} script characters, nothing else, no explanation, no English.`
+        }]
+      })
+    })
+    const data = await res.json()
+    return data.content?.[0]?.text?.trim() || ""
+  } catch {
+    return ""
+  }
 }
 
 serve(async (req) => {
@@ -34,6 +57,7 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     )
+    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY") || ""
 
     const { visit_id, prescription_id } = await req.json()
     if (!visit_id || !prescription_id) throw new Error("visit_id and prescription_id are required")
@@ -62,285 +86,236 @@ serve(async (req) => {
     const meds = (prescription.medications || []) as any[]
     const vitals = (visit.vitals || {}) as any
     const investigations = (prescription.investigations || []) as string[]
-
     const lang = clinic?.regional_language || null
     const t = lang && TRANSLATIONS[lang] ? TRANSLATIONS[lang] : null
+
     console.log("Regional language:", lang, "Has translations:", !!t)
 
     const getAge = (dob: string) => dob
       ? String(Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000)))
       : "N/A"
 
-    // Create PDF document
-    const pdfDoc = await PDFDocument.create()
-    const page = pdfDoc.addPage([595, 842]) // A4
-    const { width, height } = page.getSize()
-
-    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
-    const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica)
-    const fontItalic = await pdfDoc.embedFont(StandardFonts.HelveticaOblique)
-
-    const teal = rgb(0.051, 0.431, 0.431)
-    const dark = rgb(0.1, 0.1, 0.1)
-    const gray = rgb(0.4, 0.4, 0.4)
-    const white = rgb(1, 1, 1)
-    const lightTeal = rgb(0.941, 0.980, 0.980)
-    const headerBg = rgb(0.035, 0.271, 0.271)
-
-    let y = height - 30
-    const left = 40
-    const right = width - 40
-    const lineH = 16
-
-    const drawText = (text: string, x: number, yPos: number, size = 10, font = fontRegular, color = dark) => {
-      const safe = String(text || "").replace(/[^\x20-\x7E]/g, "")
-      if (!safe) return
-      try { page.drawText(safe, { x, y: yPos, size, font, color }) } catch {}
+    // Transliterate clinic and doctor names into regional script
+    let clinicNameRegional = ""
+    let doctorNameRegional = ""
+    if (t && anthropicKey && lang) {
+      const [cn, dn] = await Promise.all([
+        transliterateWithClaude(clinic?.name || "", lang, anthropicKey),
+        transliterateWithClaude(doctor?.name || "", lang, anthropicKey)
+      ])
+      clinicNameRegional = cn
+      doctorNameRegional = dn
+      console.log("Transliterated clinic:", clinicNameRegional, "doctor:", doctorNameRegional)
     }
 
-    const drawLine = (yPos: number, color = teal, thickness = 1) => {
-      page.drawLine({ start: { x: left, y: yPos }, end: { x: right, y: yPos }, thickness, color })
-    }
+    const checkmark = (val: boolean) => val
+      ? `<span style="color:#0D6E6E;font-weight:700;">✓</span>`
+      : `<span style="color:#ccc;">—</span>`
 
-    const drawRect = (x: number, yPos: number, w: number, h: number, color = lightTeal) => {
-      page.drawRectangle({ x, y: yPos - h, width: w, height: h, color })
-    }
+    const escHtml = (s: string) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
 
-    const truncate = (str: string, max: number) =>
-      str && str.length > max ? str.substring(0, max) + "..." : str || ""
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;700&family=Noto+Sans+Tamil:wght@400;700&family=Noto+Sans+Devanagari:wght@400;700&family=Noto+Sans+Telugu:wght@400;700&family=Noto+Sans+Kannada:wght@400;700&family=Noto+Sans+Malayalam:wght@400;700&family=Noto+Sans+Bengali:wght@400;700&family=Noto+Sans+Gujarati:wght@400;700&family=Noto+Sans+Gurmukhi:wght@400;700&family=Noto+Sans+Oriya:wght@400;700&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Noto Sans', Arial, sans-serif; font-size: 11px; color: #1a1a1a; max-width: 210mm; margin: 0 auto; padding: 14mm; }
+  .regional { font-family: 'Noto Sans Tamil','Noto Sans Devanagari','Noto Sans Telugu','Noto Sans Kannada','Noto Sans Malayalam','Noto Sans Bengali','Noto Sans Gujarati','Noto Sans Gurmukhi','Noto Sans Oriya','Noto Nastaliq Urdu','Noto Sans', sans-serif; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; background: #0D4444; color: white; padding: 14px 16px; border-radius: 6px 6px 0 0; }
+  .clinic-block .clinic-name { font-size: 20px; font-weight: 800; color: #ffffff; letter-spacing: -0.3px; }
+  .clinic-block .clinic-regional { font-size: 13px; color: #a7d4d4; margin-top: 1px; }
+  .clinic-block .clinic-sub { font-size: 9.5px; color: #c8e6e6; margin-top: 5px; line-height: 1.6; }
+  .doctor-block { text-align: right; }
+  .doctor-block .doctor-name { font-size: 15px; font-weight: 700; color: #ffffff; }
+  .doctor-block .doctor-regional { font-size: 11px; color: #a7d4d4; margin-top: 1px; }
+  .doctor-block .doctor-sub { font-size: 9px; color: #c8e6e6; margin-top: 4px; line-height: 1.7; }
+  .patient-bar { display: grid; grid-template-columns: repeat(4, 1fr); background: #e8f5f5; border: 1px solid #b2d8d8; padding: 10px 14px; gap: 8px; margin-bottom: 14px; }
+  .patient-bar .field label { font-size: 8.5px; color: #5a7a7a; text-transform: uppercase; font-weight: 700; letter-spacing: 0.4px; }
+  .patient-bar .field label .regional-label { font-weight: 400; color: #7a9a9a; }
+  .patient-bar .field p { font-size: 11.5px; font-weight: 700; margin-top: 2px; }
+  .patient-bar .field p.hid { color: #0D6E6E; }
+  .section { margin-bottom: 13px; }
+  .section-title { font-size: 10px; font-weight: 800; color: #0D6E6E; text-transform: uppercase; letter-spacing: 0.7px; border-bottom: 1.5px solid #0D6E6E; padding-bottom: 3px; margin-bottom: 7px; }
+  .section-title .regional-title { font-weight: 400; text-transform: none; letter-spacing: 0; font-size: 11px; }
+  .vitals-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .vital-chip { background: #f0fafa; border: 1px solid #b2d8d8; border-radius: 4px; padding: 3px 9px; font-size: 10px; color: #1a1a1a; }
+  .vital-chip strong { color: #0D6E6E; }
+  .soap-grid { display: grid; grid-template-columns: 110px 1fr; row-gap: 6px; }
+  .soap-label { font-size: 9px; font-weight: 700; color: #666; text-transform: uppercase; padding-top: 1px; }
+  .soap-value { font-size: 11px; color: #1a1a1a; line-height: 1.5; }
+  .rx-header { font-size: 14px; font-weight: 800; color: #0D6E6E; margin-bottom: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 10px; }
+  thead tr { background: #0D6E6E; color: white; }
+  th { padding: 6px 7px; text-align: left; font-weight: 600; font-size: 9.5px; }
+  th .regional-th { display: block; font-weight: 400; font-size: 8.5px; opacity: 0.85; }
+  td { padding: 5px 7px; border-bottom: 1px solid #e5e7eb; vertical-align: middle; }
+  tr:nth-child(even) td { background: #f9fbfb; }
+  td.check { text-align: center; font-size: 13px; }
+  .followup { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 4px; padding: 7px 12px; font-size: 11px; margin-top: 8px; }
+  .signature { margin-top: 28px; text-align: right; }
+  .sig-line { border-top: 1px solid #333; width: 200px; margin-left: auto; padding-top: 5px; }
+  .sig-name { font-size: 11px; font-weight: 700; }
+  .sig-detail { font-size: 9.5px; color: #555; line-height: 1.6; margin-top: 2px; }
+  .footer { margin-top: 18px; border-top: 1px solid #e5e7eb; padding-top: 7px; display: flex; justify-content: space-between; font-size: 8.5px; color: #aaa; }
+  @media print {
+    body { padding: 0; }
+    .footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 7px 14mm; }
+  }
+</style>
+</head>
+<body>
 
-    // -- HEADER BACKGROUND --
-    const headerH = t ? 70 : 60
-    drawRect(left, y + 10, right - left, headerH, headerBg)
+<div class="header">
+  <div class="clinic-block">
+    <div class="clinic-name">${escHtml(clinic?.name || "Clinic")}</div>
+    ${clinicNameRegional ? `<div class="clinic-regional regional">${clinicNameRegional}</div>` : ""}
+    <div class="clinic-sub">
+      ${escHtml(clinic?.address || "")}<br>
+      ${clinic?.phone ? "Tel: " + escHtml(clinic.phone) : ""}
+    </div>
+  </div>
+  <div class="doctor-block">
+    <div class="doctor-name">${escHtml(doctor?.name || "Doctor")}</div>
+    ${doctorNameRegional ? `<div class="doctor-regional regional">${doctorNameRegional}</div>` : ""}
+    <div class="doctor-sub">
+      ${escHtml(doctor?.qualification || "")}<br>
+      ${doctor?.registration_number ? "Reg: " + escHtml(doctor.registration_number) : ""}<br>
+      ${escHtml(doctor?.specialty || "")}
+    </div>
+  </div>
+</div>
 
-    // Clinic name + transliterated subtitle
-    drawText(clinic?.name || "Clinic", left + 10, y - 5, 18, fontBold, white)
-    if (t) {
-      drawText("(" + t.clinic + ")", left + 10, y - 20, 9, fontItalic, rgb(0.7, 0.9, 0.9))
-    }
-    const addrY = t ? y - 33 : y - 22
-    drawText(clinic?.address || "", left + 10, addrY, 8, fontRegular, rgb(0.8, 0.9, 0.9))
-    drawText(clinic?.phone ? "Tel: " + clinic.phone : "", left + 10, addrY - 11, 8, fontRegular, rgb(0.8, 0.9, 0.9))
+<div class="patient-bar">
+  <div class="field">
+    <label>${t ? `<span class="regional-label regional">${t.patient}</span> / ` : ""}Patient</label>
+    <p>${escHtml(patient?.name || "—")}</p>
+  </div>
+  <div class="field">
+    <label>Healthcare ID</label>
+    <p class="hid">${escHtml(patient?.healthcare_id || "—")}</p>
+  </div>
+  <div class="field">
+    <label>Age / Gender</label>
+    <p>${getAge(patient?.dob)}y / ${escHtml(patient?.gender || "—")}</p>
+  </div>
+  <div class="field">
+    <label>${t ? `<span class="regional-label regional">${t.date}</span> / ` : ""}Date</label>
+    <p>${new Date().toLocaleDateString("en-IN")}</p>
+  </div>
+</div>
 
-    // Doctor block right side
-    const drName = doctor?.name || "Doctor"
-    const drNameW = fontBold.widthOfTextAtSize(drName, 12)
-    drawText(drName, right - drNameW - 10, y - 5, 12, fontBold, white)
-    if (t) {
-      const drSub = "(" + t.doctor + ")"
-      const drSubW = fontItalic.widthOfTextAtSize(drSub, 9)
-      drawText(drSub, right - drSubW - 10, y - 18, 9, fontItalic, rgb(0.7, 0.9, 0.9))
-    }
-    const drDetailY = t ? y - 30 : y - 19
-    const drQual = doctor?.qualification || ""
-    drawText(drQual, right - fontRegular.widthOfTextAtSize(drQual, 8) - 10, drDetailY, 8, fontRegular, rgb(0.8, 0.9, 0.9))
-    const drReg = doctor?.registration_number ? "Reg: " + doctor.registration_number : ""
-    drawText(drReg, right - fontRegular.widthOfTextAtSize(drReg, 8) - 10, drDetailY - 11, 8, fontRegular, rgb(0.8, 0.9, 0.9))
-    const drSpec = doctor?.specialty || ""
-    drawText(drSpec, right - fontRegular.widthOfTextAtSize(drSpec, 8) - 10, drDetailY - 22, 8, fontRegular, rgb(0.8, 0.9, 0.9))
+${Object.keys(vitals).length > 0 ? `
+<div class="section">
+  <div class="section-title">Vitals</div>
+  <div class="vitals-row">
+    ${vitals.bp_sys ? `<div class="vital-chip"><strong>BP</strong> ${escHtml(vitals.bp_sys)}/${escHtml(vitals.bp_dia)} mmHg</div>` : ""}
+    ${vitals.pulse ? `<div class="vital-chip"><strong>Pulse</strong> ${escHtml(vitals.pulse)} bpm</div>` : ""}
+    ${vitals.temp || vitals.temperature ? `<div class="vital-chip"><strong>Temp</strong> ${escHtml(vitals.temp || vitals.temperature)}°F</div>` : ""}
+    ${vitals.spo2 ? `<div class="vital-chip"><strong>SpO2</strong> ${escHtml(vitals.spo2)}%</div>` : ""}
+    ${vitals.weight ? `<div class="vital-chip"><strong>Wt</strong> ${escHtml(vitals.weight)} kg</div>` : ""}
+    ${vitals.height ? `<div class="vital-chip"><strong>Ht</strong> ${escHtml(vitals.height)} cm</div>` : ""}
+  </div>
+</div>` : ""}
 
-    y -= (headerH + 10)
+${visit.chief_complaint ? `
+<div class="section">
+  <div class="section-title">Chief Complaint</div>
+  <p>${escHtml(visit.chief_complaint)}</p>
+</div>` : ""}
 
-    // -- PATIENT BAR --
-    page.drawRectangle({ x: left, y: y - 36, width: right - left, height: 40, borderColor: teal, borderWidth: 0.5, color: lightTeal })
+${soap.assessment || soap.subjective ? `
+<div class="section">
+  <div class="section-title">
+    ${t ? `<span class="regional-title regional">${t.soap}</span> / ` : ""}Clinical Notes (SOAP)
+  </div>
+  <div class="soap-grid">
+    ${soap.subjective ? `<div class="soap-label">S – Subjective</div><div class="soap-value">${escHtml(soap.subjective)}</div>` : ""}
+    ${soap.objective ? `<div class="soap-label">O – Objective</div><div class="soap-value">${escHtml(soap.objective)}</div>` : ""}
+    ${soap.assessment ? `<div class="soap-label">A – Assessment</div><div class="soap-value">${escHtml(soap.assessment)}</div>` : ""}
+    ${soap.plan ? `<div class="soap-label">P – Plan</div><div class="soap-value">${escHtml(soap.plan)}</div>` : ""}
+  </div>
+</div>` : ""}
 
-    const colW = (right - left) / 4
-    const patLabel = t ? t.patient + " / Patient" : "Patient"
-    const dateLabel = t ? t.date + " / Date" : "Date"
-    const fields: [string, string][] = [
-      [patLabel, patient?.name || "—"],
-      ["Healthcare ID", patient?.healthcare_id || "—"],
-      ["Age / Gender", `${getAge(patient?.dob)}y / ${patient?.gender || "—"}`],
-      [dateLabel, new Date().toLocaleDateString("en-IN")],
-    ]
-    fields.forEach(([label, value], i) => {
-      const x = left + 8 + i * colW
-      drawText(label, x, y - 4, 7, fontBold, gray)
-      drawText(truncate(value, 20), x, y - 16, 9, fontBold, i === 1 ? teal : dark)
-    })
+${meds.length > 0 ? `
+<div class="section">
+  <div class="rx-header">℞  ${t ? `<span class="regional">${t.rx}</span> / ` : ""}Prescription</div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Drug / Medicine</th>
+        <th>Dosage</th>
+        <th>M${t ? `<span class="regional-th regional">${t.morning}</span>` : ""}</th>
+        <th>A${t ? `<span class="regional-th regional">${t.afternoon}</span>` : ""}</th>
+        <th>E${t ? `<span class="regional-th regional">${t.evening}</span>` : ""}</th>
+        <th>N${t ? `<span class="regional-th regional">${t.night}</span>` : ""}</th>
+        <th>Duration</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${meds.map((m: any, i: number) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td><strong>${escHtml(m.name || "—")}</strong></td>
+        <td>${escHtml(m.dosage || "—")}</td>
+        <td class="check">${checkmark(m.morning)}</td>
+        <td class="check">${checkmark(m.afternoon)}</td>
+        <td class="check">${checkmark(m.evening)}</td>
+        <td class="check">${checkmark(m.night)}</td>
+        <td>${escHtml(m.duration || "—")}</td>
+      </tr>`).join("")}
+    </tbody>
+  </table>
+</div>` : ""}
 
-    y -= 50
+${investigations.length > 0 ? `
+<div class="section">
+  <div class="section-title">${t ? `<span class="regional-title regional">${t.investigations}</span> / ` : ""}Investigations</div>
+  <p>${investigations.map(escHtml).join("  •  ")}</p>
+</div>` : ""}
 
-    // -- VITALS --
-    if (Object.keys(vitals).length > 0) {
-      drawText("VITALS", left, y, 8, fontBold, teal)
-      y -= 4
-      drawLine(y, teal, 0.5)
-      y -= 14
+${prescription.follow_up_date ? `
+<div class="followup">
+  📅 ${t ? `<span class="regional">${t.followUp}</span> / ` : ""}Follow-up:
+  ${new Date(prescription.follow_up_date).toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+</div>` : ""}
 
-      const vitalItems = [
-        vitals.bp_sys ? `BP: ${vitals.bp_sys}/${vitals.bp_dia} mmHg` : null,
-        vitals.pulse ? `Pulse: ${vitals.pulse} bpm` : null,
-        vitals.temp || vitals.temperature ? `Temp: ${vitals.temp || vitals.temperature}F` : null,
-        vitals.spo2 ? `SpO2: ${vitals.spo2}%` : null,
-        vitals.weight ? `Wt: ${vitals.weight} kg` : null,
-        vitals.height ? `Ht: ${vitals.height} cm` : null,
-      ].filter(Boolean) as string[]
+<div class="signature">
+  <div class="sig-line">
+    <div class="sig-name">${escHtml(doctor?.name || "Doctor")}</div>
+    ${doctorNameRegional ? `<div class="sig-detail regional">${doctorNameRegional}</div>` : ""}
+    <div class="sig-detail">${escHtml(doctor?.qualification || "")}</div>
+    <div class="sig-detail">${doctor?.registration_number ? "Reg: " + escHtml(doctor.registration_number) : ""}</div>
+  </div>
+</div>
 
-      let vx = left
-      vitalItems.forEach(v => {
-        const vw = fontRegular.widthOfTextAtSize(v, 9) + 16
-        page.drawRectangle({ x: vx, y: y - 12, width: vw, height: 16, color: rgb(0.96, 0.99, 0.99), borderColor: teal, borderWidth: 0.4 })
-        drawText(v, vx + 6, y - 4, 9, fontRegular, dark)
-        vx += vw + 6
-        if (vx > right - 60) { vx = left; y -= 20 }
-      })
-      y -= 26
-    }
+<div class="footer">
+  <span>Generated by StethoScribe</span>
+  <span>${new Date().toLocaleString("en-IN")}</span>
+</div>
 
-    // -- CHIEF COMPLAINT --
-    if (visit.chief_complaint) {
-      drawText("CHIEF COMPLAINT", left, y, 8, fontBold, teal)
-      y -= 4
-      drawLine(y, teal, 0.5)
-      y -= 14
-      drawText(truncate(visit.chief_complaint, 90), left, y, 10, fontRegular, dark)
-      y -= 20
-    }
+</body>
+</html>`
 
-    // -- SOAP NOTES --
-    if (soap.assessment || soap.subjective) {
-      const soapLabel = t ? t.soap + " / CLINICAL NOTES (SOAP)" : "CLINICAL NOTES (SOAP)"
-      drawText(soapLabel, left, y, 8, fontBold, teal)
-      y -= 4
-      drawLine(y, teal, 0.5)
-      y -= 14
-
-      const soapFields: [string, string][] = [
-        ["S - Subjective", soap.subjective],
-        ["O - Objective", soap.objective],
-        ["A - Assessment", soap.assessment],
-        ["P - Plan", soap.plan],
-      ]
-
-      soapFields.forEach(([label, value]) => {
-        if (!value) return
-        drawText(label + ":", left, y, 8, fontBold, gray)
-        const words = String(value).split(" ")
-        let line = ""
-        let lx = left + 120
-        words.forEach(word => {
-          const test = line + word + " "
-          if (fontRegular.widthOfTextAtSize(test, 9) > right - left - 125) {
-            drawText(line.trim(), lx, y, 9, fontRegular, dark)
-            line = word + " "
-            y -= lineH - 4
-            lx = left + 120
-          } else {
-            line = test
-          }
-        })
-        if (line.trim()) drawText(line.trim(), lx, y, 9, fontRegular, dark)
-        y -= lineH
-      })
-      y -= 6
-    }
-
-    // -- MEDICATIONS WITH TIMING COLUMNS --
-    if (meds.length > 0) {
-      const rxLabel = t ? t.rx + " / Rx PRESCRIPTION" : "Rx PRESCRIPTION"
-      drawText(rxLabel, left, y, 10, fontBold, teal)
-      y -= 4
-      drawLine(y, teal, 1)
-      y -= 6
-
-      // Columns: #, Drug, Dosage, M, A, E, N, Duration
-      const cw = [22, 110, 55, 38, 38, 38, 38, 55]
-      const cx = [left]
-      cw.forEach((w, i) => cx.push(cx[i] + w))
-
-      // Header labels with transliterated timing
-      const mHead = t ? "M (" + t.morning.substring(0, 4) + ")" : "M"
-      const aHead = t ? "A (" + t.afternoon.substring(0, 4) + ")" : "A"
-      const eHead = t ? "E (" + t.evening.substring(0, 4) + ")" : "E"
-      const nHead = t ? "N (" + t.night.substring(0, 4) + ")" : "N"
-      const headers = ["#", "Drug / Medicine", "Dosage", mHead, aHead, eHead, nHead, "Duration"]
-
-      drawRect(left, y + 4, right - left, 18, teal)
-      headers.forEach((h, i) => drawText(h, cx[i] + 2, y - 6, 7, fontBold, white))
-      y -= 20
-
-      meds.forEach((m: any, idx: number) => {
-        if (idx % 2 === 0) drawRect(left, y + 4, right - left, 16, rgb(0.97, 0.99, 0.99))
-        const row = [
-          String(idx + 1),
-          m.name || "—",
-          m.dosage || "—",
-          m.morning ? "Y" : "-",
-          m.afternoon ? "Y" : "-",
-          m.evening ? "Y" : "-",
-          m.night ? "Y" : "-",
-          m.duration || "—"
-        ]
-        row.forEach((val, i) => {
-          drawText(truncate(val, i === 1 ? 18 : 14), cx[i] + 2, y - 4, 9,
-            i === 1 ? fontBold : fontRegular,
-            [3, 4, 5, 6].includes(i) && val === "Y" ? teal : dark)
-        })
-        y -= 16
-      })
-      y -= 8
-    }
-
-    // -- INVESTIGATIONS --
-    if (investigations.length > 0) {
-      const invLabel = t ? t.investigations + " / INVESTIGATIONS" : "INVESTIGATIONS"
-      drawText(invLabel, left, y, 8, fontBold, teal)
-      y -= 4
-      drawLine(y, teal, 0.5)
-      y -= 14
-      drawText(investigations.join("  |  "), left, y, 9, fontRegular, dark)
-      y -= 20
-    }
-
-    // -- FOLLOW UP --
-    if (prescription.follow_up_date) {
-      const fuLabel = t ? t.followUp + " / Follow-up" : "Follow-up"
-      page.drawRectangle({ x: left, y: y - 16, width: right - left, height: 20, borderColor: rgb(0.99, 0.83, 0.2), borderWidth: 0.5, color: rgb(1, 0.99, 0.88) })
-      drawText(fuLabel + ": " + new Date(prescription.follow_up_date).toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" }), left + 8, y - 4, 10, fontBold, rgb(0.5, 0.35, 0))
-      y -= 28
-    }
-
-    // -- SIGNATURE --
-    y -= 20
-    const sigX = right - 180
-    page.drawLine({ start: { x: sigX, y }, end: { x: right, y }, thickness: 0.5, color: dark })
-    drawText(doctor?.name || "Doctor", sigX, y - 14, 10, fontBold, dark)
-    drawText(doctor?.qualification || "", sigX, y - 26, 8, fontRegular, gray)
-    drawText(doctor?.registration_number ? "Reg: " + doctor.registration_number : "", sigX, y - 37, 8, fontRegular, gray)
-
-    // -- FOOTER --
-    drawLine(50, rgb(0.8, 0.8, 0.8), 0.5)
-    drawText("Generated by StethoScribe", left, 38, 8, fontRegular, gray)
-    const dateStr = new Date().toLocaleString("en-IN")
-    const dateW = fontRegular.widthOfTextAtSize(dateStr, 8)
-    drawText(dateStr, right - dateW, 38, 8, fontRegular, gray)
-
-    // -- LANGUAGE TAG --
-    if (t && lang) {
-      drawText("Language: " + lang, left + 180, 38, 7, fontItalic, gray)
-    }
-
-    // Serialize PDF
-    const pdfBytes = await pdfDoc.save()
-
-    // Upload to storage
-    const path = `${visit.clinic_id}/${new Date().getFullYear()}/${prescription_id}.pdf`
-    await supabaseAdmin.storage.from("prescriptions").upload(path, pdfBytes, {
-      contentType: "application/pdf",
-      upsert: true,
-    })
-
-    await supabaseAdmin.from("prescriptions").update({ pdf_url: path }).eq("id", prescription_id)
+    const path = `${visit.clinic_id}/${new Date().getFullYear()}/${prescription_id}.html`
+    const bytes = new TextEncoder().encode(html)
+    await supabaseAdmin.storage.from("prescriptions")
+      .upload(path, bytes, { contentType: "text/html;charset=utf-8", upsert: true })
+    await supabaseAdmin.from("prescriptions")
+      .update({ pdf_url: path }).eq("id", prescription_id)
 
     return new Response(JSON.stringify({ success: true, path }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     })
 
   } catch (error) {
-    console.error("PDF generation error:", error)
-    return new Response(JSON.stringify({ error: String(error) }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
-    })
+    console.error("Prescription generation error:", error)
+    return new Response(
+      JSON.stringify({ error: String(error) }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    )
   }
 })
