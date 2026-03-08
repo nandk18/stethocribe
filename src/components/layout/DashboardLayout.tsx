@@ -5,7 +5,7 @@ import { NavLink } from "@/components/NavLink";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
-  Stethoscope, Users, CalendarDays, Settings, LogOut, UserPlus, Menu, X
+  Stethoscope, Users, CalendarDays, Settings, LogOut, UserPlus, Menu, X, FileText
 } from "lucide-react";
 
 const receptionistLinks = [
