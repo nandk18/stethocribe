@@ -81,6 +81,35 @@ const tabIcons = [User, History, Mic, FileText, Pill, Upload];
 // Default SOAP sections if no template selected
 const DEFAULT_SECTIONS = ["subjective", "objective", "assessment", "plan"];
 
+async function getDoctorForUser(userId: string, clinicId: string) {
+  const { data: doctor } = await supabase
+    .from("doctors")
+    .select("*")
+    .eq("user_id", userId)
+    .single();
+  if (doctor) return doctor;
+
+  // Auto-create doctor record for admin if missing
+  const { data: profileData } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("user_id", userId)
+    .single();
+
+  const { data: newDoctor } = await supabase
+    .from("doctors")
+    .insert({
+      clinic_id: clinicId,
+      user_id: userId,
+      name: profileData?.full_name || "Admin Doctor",
+      specialty: "General Medicine",
+    })
+    .select()
+    .single();
+
+  return newDoctor;
+}
+
 export default function ConsultationWorkspace({ visit, onComplete }: { visit: Visit; onComplete: () => void }) {
   const { profile } = useAuth();
   const { clinic, doctor } = useClinic();
