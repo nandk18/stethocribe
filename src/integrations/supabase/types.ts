@@ -106,7 +106,9 @@ export type Database = {
           availability: string | null
           clinic_id: string
           created_at: string | null
+          default_template: string | null
           default_template_id: string | null
+          enabled_templates: string[] | null
           id: string
           name: string
           qualification: string | null
@@ -119,7 +121,9 @@ export type Database = {
           availability?: string | null
           clinic_id: string
           created_at?: string | null
+          default_template?: string | null
           default_template_id?: string | null
+          enabled_templates?: string[] | null
           id?: string
           name: string
           qualification?: string | null
@@ -132,7 +136,9 @@ export type Database = {
           availability?: string | null
           clinic_id?: string
           created_at?: string | null
+          default_template?: string | null
           default_template_id?: string | null
+          enabled_templates?: string[] | null
           id?: string
           name?: string
           qualification?: string | null
