@@ -9,9 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Mic, FileText, Pill, CheckCircle, AlertTriangle, Activity, History, ClipboardList, FolderOpen } from "lucide-react";
+import { Mic, FileText, Pill, CheckCircle, AlertTriangle, Activity, History, User, FolderOpen, Upload } from "lucide-react";
 import VoiceRecorder from "@/components/doctor/VoiceRecorder";
 import PatientHistory from "@/components/doctor/PatientHistory";
 import PrescriptionShareModal from "@/components/doctor/PrescriptionShareModal";
@@ -39,11 +38,15 @@ type Medication = {
   evening: boolean; night: boolean; duration: string; notes: string;
 };
 
+const tabs = ["summary", "history", "voice", "soap", "prescription", "documents"] as const;
+const tabLabels = ["Summary", "History", "Voice", "SOAP", "Rx", "Docs"];
+const tabIcons = [User, History, Mic, FileText, Pill, Upload];
+
 export default function ConsultationWorkspace({ visit, onComplete }: { visit: Visit; onComplete: () => void }) {
   const { profile } = useAuth();
   const { clinic, doctor } = useClinic();
   const isMobile = useIsMobile();
-  const [tab, setTab] = useState("summary");
+  const [tab, setTab] = useState<string>("summary");
 
   // SOAP Notes
   const [subjective, setSubjective] = useState("");
@@ -81,14 +84,10 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
     if (soapData.plan) setPlan(soapData.plan);
     if (soapData.medications?.length) {
       setMedications(soapData.medications.map((m: any) => ({
-        name: m.name || "",
-        dosage: m.dosage || "",
-        morning: !!m.morning,
-        afternoon: !!m.afternoon,
-        evening: !!m.evening,
-        night: !!m.night,
-        duration: m.duration || "",
-        notes: m.notes || m.instructions || "",
+        name: m.name || "", dosage: m.dosage || "",
+        morning: !!m.morning, afternoon: !!m.afternoon,
+        evening: !!m.evening, night: !!m.night,
+        duration: m.duration || "", notes: m.notes || m.instructions || "",
       })));
     }
     if (soapData.investigations?.length) setInvestigations(soapData.investigations.join(", "));
@@ -135,11 +134,10 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
       await supabase.from("visits").update({ status: "completed", doctor_id: doctorRow.id }).eq("id", visit.id);
 
       // Save default template for doctor
-      if (selectedTemplate?.id) {
-        await supabase.from("doctors").update({ default_template_id: selectedTemplate.id } as any).eq("id", doctorRow.id);
+      if (selectedTemplate?.name) {
+        await supabase.from("doctors").update({ default_template: selectedTemplate.name } as any).eq("id", doctorRow.id);
       }
 
-      // Trigger PDF generation and show share modal
       if (prescriptionId) {
         const { data: pdfResult, error: pdfError } = await supabase.functions.invoke("generate-prescription-pdf", {
           body: { visit_id: visit.id, prescription_id: prescriptionId },
@@ -163,14 +161,11 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
     }
   };
 
-  const mobileTabItems = [
-    { value: "summary", label: "Sum" },
-    { value: "history", label: "Hist" },
-    { value: "record", label: "Rec" },
-    { value: "soap", label: "SOAP" },
-    { value: "prescription", label: "Rx" },
-    { value: "documents", label: "Docs" },
-  ];
+  // Map tab key to content
+  const tabContentMap: Record<string, string> = {
+    summary: "summary", history: "history", voice: "voice",
+    soap: "soap", prescription: "prescription", documents: "documents",
+  };
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -235,51 +230,49 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
         </CardContent>
       </Card>
 
-      {/* Mobile: pill row tabs */}
+      {/* Mobile: 2x3 grid of pill buttons */}
       {isMobile ? (
         <div className="space-y-4">
-          <div className="flex gap-1">
-            {mobileTabItems.map(item => (
-              <button
-                key={item.value}
-                className={`flex-1 py-2 text-xs font-medium rounded-full transition-all ${
-                  tab === item.value
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
-                }`}
-                onClick={() => setTab(item.value)}
-              >
-                {item.label}
-              </button>
-            ))}
+          <div className="grid grid-cols-3 gap-1.5 p-2 bg-muted/50 rounded-xl md:hidden">
+            {tabs.map((t, i) => {
+              const Icon = tabIcons[i];
+              return (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  className={`flex flex-col items-center py-2.5 px-1 rounded-lg text-xs font-medium transition-all ${
+                    tab === t
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-background text-muted-foreground border border-border"
+                  }`}
+                >
+                  <Icon className="w-4 h-4 mb-0.5" />
+                  {tabLabels[i]}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Content */}
           {tab === "summary" && renderSummary()}
           {tab === "history" && visit.patient && <PatientHistory patientId={visit.patient.id} currentVisitId={visit.id} />}
-          {tab === "record" && <VoiceRecorder visitId={visit.id} onTranscriptProcessed={handleTranscriptProcessed} />}
+          {tab === "voice" && <VoiceRecorder visitId={visit.id} onTranscriptProcessed={handleTranscriptProcessed} />}
           {tab === "soap" && renderSoap()}
           {tab === "prescription" && renderPrescription()}
           {tab === "documents" && visit.patient && profile?.clinic_id && (
             <DocumentsTab visitId={visit.id} patientId={visit.patient.id} clinicId={profile.clinic_id} />
           )}
 
-          <Button
-            className="w-full h-12 rounded-xl font-medium"
-            onClick={handleCompleteConsultation}
-            disabled={saving}
-          >
+          <Button className="w-full h-12 rounded-xl font-medium" onClick={handleCompleteConsultation} disabled={saving}>
             <CheckCircle className="mr-2 h-5 w-5" />
             {saving ? "Saving..." : "Complete Consultation"}
           </Button>
         </div>
       ) : (
-        /* Desktop: standard tabs */
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="rounded-xl">
             <TabsTrigger value="summary" className="rounded-lg">Summary</TabsTrigger>
             <TabsTrigger value="history" className="rounded-lg"><History className="mr-1.5 h-3.5 w-3.5" /> History</TabsTrigger>
-            <TabsTrigger value="record" className="rounded-lg"><Mic className="mr-1.5 h-3.5 w-3.5" /> Voice</TabsTrigger>
+            <TabsTrigger value="voice" className="rounded-lg"><Mic className="mr-1.5 h-3.5 w-3.5" /> Voice</TabsTrigger>
             <TabsTrigger value="soap" className="rounded-lg"><FileText className="mr-1.5 h-3.5 w-3.5" /> SOAP</TabsTrigger>
             <TabsTrigger value="prescription" className="rounded-lg"><Pill className="mr-1.5 h-3.5 w-3.5" /> Rx</TabsTrigger>
             <TabsTrigger value="documents" className="rounded-lg"><FolderOpen className="mr-1.5 h-3.5 w-3.5" /> Docs</TabsTrigger>
@@ -289,7 +282,7 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
           <TabsContent value="history">
             {visit.patient && <PatientHistory patientId={visit.patient.id} currentVisitId={visit.id} />}
           </TabsContent>
-          <TabsContent value="record">
+          <TabsContent value="voice">
             <VoiceRecorder visitId={visit.id} onTranscriptProcessed={handleTranscriptProcessed} />
           </TabsContent>
           <TabsContent value="soap">{renderSoap()}</TabsContent>
@@ -312,16 +305,13 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
         </div>
       )}
 
-      {/* Sharing modal with EMR export */}
       <PrescriptionShareModal
         open={shareOpen}
         onClose={() => { setShareOpen(false); onComplete(); }}
         prescriptionPdfUrl={sharePdfUrl}
         patient={visit.patient ? {
-          name: visit.patient.name,
-          phone: visit.patient.phone || null,
-          email: visit.patient.email || null,
-          healthcare_id: visit.patient.healthcare_id || null,
+          name: visit.patient.name, phone: visit.patient.phone || null,
+          email: visit.patient.email || null, healthcare_id: visit.patient.healthcare_id || null,
         } : null}
         clinicName={clinic?.name || "Clinic"}
         doctorName={doctor?.name || "Doctor"}
@@ -387,28 +377,41 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
         <CardContent className="space-y-4 p-6">
           <div>
             <Label className="font-semibold mb-3 block">Medications (Rx)</Label>
-            <div className="space-y-3">
+            {/* Header row */}
+            <div className="hidden sm:grid grid-cols-12 gap-1 text-xs font-semibold text-muted-foreground px-1 py-1 mb-1">
+              <div className="col-span-3">Drug</div>
+              <div className="col-span-2">Dosage</div>
+              <div className="col-span-4 text-center">M · A · E · N</div>
+              <div className="col-span-2">Duration</div>
+              <div className="col-span-1"></div>
+            </div>
+            <div className="space-y-2">
               {medications.map((med, i) => (
-                <div key={i} className="rounded-xl bg-muted/30 p-3 space-y-2">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    <Input placeholder="Drug name" value={med.name} onChange={e => updateMed(i, "name", e.target.value)} className="col-span-2 sm:col-span-1 rounded-lg" />
-                    <Input placeholder="Dosage" value={med.dosage} onChange={e => updateMed(i, "dosage", e.target.value)} className="rounded-lg" />
-                    <Input placeholder="Duration" value={med.duration} onChange={e => updateMed(i, "duration", e.target.value)} className="rounded-lg" />
+                <div key={i} className="grid grid-cols-12 gap-1 items-center py-2 border-b border-border last:border-0">
+                  <div className="col-span-12 sm:col-span-3">
+                    <Input placeholder="Drug name" value={med.name} onChange={e => updateMed(i, "name", e.target.value)} className="rounded-lg text-sm h-9" />
                   </div>
-                  <div className="flex items-center gap-4 flex-wrap">
-                    <span className="text-xs font-medium text-muted-foreground">Timing:</span>
-                    {(["morning", "afternoon", "evening", "night"] as const).map(time => (
-                      <label key={time} className="flex items-center gap-1.5 text-xs cursor-pointer">
-                        <Checkbox
-                          checked={med[time]}
-                          onCheckedChange={(v) => updateMed(i, time, !!v)}
-                          className="h-4 w-4"
+                  <div className="col-span-5 sm:col-span-2">
+                    <Input placeholder="Dosage" value={med.dosage} onChange={e => updateMed(i, "dosage", e.target.value)} className="rounded-lg text-sm h-9" />
+                  </div>
+                  <div className="col-span-5 sm:col-span-4 flex gap-3 justify-center">
+                    {(["morning", "afternoon", "evening", "night"] as const).map(timing => (
+                      <label key={timing} className="flex flex-col items-center text-xs cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={med[timing] || false}
+                          onChange={e => updateMed(i, timing, e.target.checked)}
+                          className="accent-primary w-4 h-4"
                         />
-                        <span className="capitalize">{time.charAt(0).toUpperCase()}</span>
+                        {timing === "morning" ? "M" : timing === "afternoon" ? "A" : timing === "evening" ? "E" : "N"}
                       </label>
                     ))}
-                    <Input placeholder="Notes" value={med.notes} onChange={e => updateMed(i, "notes", e.target.value)} className="flex-1 min-w-[120px] rounded-lg text-xs h-8" />
-                    <Button variant="ghost" size="sm" onClick={() => removeMedRow(i)} className="text-destructive h-8 w-8 p-0">✕</Button>
+                  </div>
+                  <div className="col-span-10 sm:col-span-2">
+                    <Input placeholder="Duration" value={med.duration} onChange={e => updateMed(i, "duration", e.target.value)} className="rounded-lg text-sm h-9" />
+                  </div>
+                  <div className="col-span-2 sm:col-span-1 flex justify-center">
+                    <button onClick={() => removeMedRow(i)} className="text-destructive/60 hover:text-destructive text-lg">✕</button>
                   </div>
                 </div>
               ))}

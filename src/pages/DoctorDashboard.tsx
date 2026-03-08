@@ -5,8 +5,9 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, AlertTriangle, Stethoscope, ArrowRight, Eye } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Clock, AlertTriangle, Stethoscope, ArrowRight, Eye, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 type Visit = {
@@ -20,12 +21,25 @@ type Visit = {
   patient: { id: string; name: string; healthcare_id: string | null; gender: string | null; dob: string | null; blood_group: string | null; allergies: any; chronic_conditions: any } | null;
 };
 
+type CompletedNotes = {
+  soap: any;
+  medications: any[];
+  investigations: string[];
+  follow_up_date: string | null;
+};
+
 export default function DoctorDashboard() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const [visits, setVisits] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+
+  // View notes sheet
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesVisit, setNotesVisit] = useState<Visit | null>(null);
+  const [notesData, setNotesData] = useState<CompletedNotes | null>(null);
+  const [notesLoading, setNotesLoading] = useState(false);
 
   const fetchVisits = useCallback(async () => {
     if (!profile?.clinic_id) return;
@@ -53,10 +67,30 @@ export default function DoctorDashboard() {
   }, [fetchVisits]);
 
   const handleStartConsultation = async (visit: Visit) => {
+    if (visit.status === "completed") return; // Block completed
     if (visit.status === "waiting") {
       await supabase.from("visits").update({ status: "in_progress" }).eq("id", visit.id);
     }
     navigate(`/dashboard/consultation/${visit.id}`);
+  };
+
+  const handleViewNotes = async (visit: Visit) => {
+    setNotesVisit(visit);
+    setNotesOpen(true);
+    setNotesLoading(true);
+    try {
+      const [notesRes, rxRes] = await Promise.all([
+        supabase.from("clinical_notes").select("soap_notes").eq("visit_id", visit.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("prescriptions").select("medications, investigations, follow_up_date").eq("visit_id", visit.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      ]);
+      setNotesData({
+        soap: notesRes.data?.soap_notes || {},
+        medications: (rxRes.data?.medications as any[]) || [],
+        investigations: (rxRes.data?.investigations as string[]) || [],
+        follow_up_date: rxRes.data?.follow_up_date || null,
+      });
+    } catch { setNotesData(null); }
+    finally { setNotesLoading(false); }
   };
 
   const getAge = (dob: string | null) => {
@@ -74,14 +108,11 @@ export default function DoctorDashboard() {
   const statusColor = (status: string) => {
     if (status === "waiting") return "bg-warning/15 text-warning border-warning/30";
     if (status === "in_progress") return "bg-info/15 text-info border-info/30";
-    if (status === "completed") return "bg-success/15 text-success border-success/30";
+    if (status === "completed") return "bg-muted text-muted-foreground border-muted";
     return "bg-muted text-muted-foreground";
   };
 
-  const filteredVisits = visits.filter(v => {
-    if (filter === "all") return true;
-    return v.status === filter;
-  });
+  const filteredVisits = visits.filter(v => filter === "all" || v.status === filter);
 
   const counts = {
     all: visits.length,
@@ -104,7 +135,6 @@ export default function DoctorDashboard() {
         </div>
       </div>
 
-      {/* Filter tabs */}
       <Tabs value={filter} onValueChange={setFilter} className="mb-6">
         <TabsList>
           <TabsTrigger value="all">All ({counts.all})</TabsTrigger>
@@ -114,7 +144,6 @@ export default function DoctorDashboard() {
         </TabsList>
       </Tabs>
 
-      {/* Queue list */}
       <div className="space-y-3">
         {loading ? (
           [1, 2, 3].map(i => <div key={i} className="h-24 animate-pulse rounded-lg bg-muted" />)
@@ -124,76 +153,142 @@ export default function DoctorDashboard() {
             <h3 className="font-display text-lg font-semibold text-muted-foreground">No patients {filter !== "all" ? `${filter.replace("_", " ")}` : "today"}</h3>
           </div>
         ) : (
-          filteredVisits.map(visit => (
-            <Card
-              key={visit.id}
-              className="shadow-card transition-all hover:shadow-elevated cursor-pointer"
-              onClick={() => handleStartConsultation(visit)}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-center gap-4">
-                  {/* Token */}
-                  <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 font-display text-xl font-bold text-primary">
-                    #{visit.token_number}
-                  </div>
-
-                  {/* Patient info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-foreground truncate">{visit.patient?.name}</p>
-                      {visit.patient?.healthcare_id && (
-                        <span className="font-mono text-[10px] text-primary">{visit.patient.healthcare_id}</span>
-                      )}
+          filteredVisits.map(visit => {
+            const isCompleted = visit.status === "completed";
+            return (
+              <Card
+                key={visit.id}
+                className={`shadow-card transition-all ${isCompleted ? "opacity-70" : "hover:shadow-elevated cursor-pointer"}`}
+                onClick={() => !isCompleted && handleStartConsultation(visit)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-4">
+                    <div className={`flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl font-display text-xl font-bold ${isCompleted ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}>
+                      #{visit.token_number}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {visit.patient?.gender}{visit.patient?.dob && `, ${getAge(visit.patient.dob)}y`}
-                      {visit.patient?.blood_group && ` · ${visit.patient.blood_group}`}
-                    </p>
-                    {visit.chief_complaint && (
-                      <p className="text-sm text-foreground/80 mt-1 truncate">{visit.chief_complaint}</p>
-                    )}
-                    <div className="mt-2 flex items-center gap-2 flex-wrap">
-                      {/* Vitals status */}
-                      {visit.vitals && Object.keys(visit.vitals).length > 0 ? (
-                        <Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/30">🟢 Vitals recorded</Badge>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-foreground truncate">{visit.patient?.name}</p>
+                        {visit.patient?.healthcare_id && (
+                          <span className="font-mono text-[10px] text-primary">{visit.patient.healthcare_id}</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {visit.patient?.gender}{visit.patient?.dob && `, ${getAge(visit.patient.dob)}y`}
+                        {visit.patient?.blood_group && ` · ${visit.patient.blood_group}`}
+                      </p>
+                      {visit.chief_complaint && (
+                        <p className="text-sm text-foreground/80 mt-1 truncate">{visit.chief_complaint}</p>
+                      )}
+                      <div className="mt-2 flex items-center gap-2 flex-wrap">
+                        {visit.vitals && Object.keys(visit.vitals).length > 0 ? (
+                          <Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/30">Vitals recorded</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/30">No vitals</Badge>
+                        )}
+                        {visit.patient?.allergies && Array.isArray(visit.patient.allergies) && visit.patient.allergies.length > 0 && (
+                          <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive text-[10px]">
+                            <AlertTriangle className="mr-1 h-2.5 w-2.5" /> Allergies
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                      <Badge variant="outline" className={statusColor(visit.status)}>
+                        {isCompleted && <Lock className="mr-1 h-3 w-3" />}
+                        {visit.status.replace("_", " ")}
+                      </Badge>
+                      {visit.status === "waiting" && (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" /> {getWaitTime(visit.created_at)}
+                        </span>
+                      )}
+                      {isCompleted ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs"
+                          onClick={(e) => { e.stopPropagation(); handleViewNotes(visit); }}
+                        >
+                          <Eye className="mr-1 h-3 w-3" /> View Notes
+                        </Button>
                       ) : (
-                        <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/30">🔴 No vitals</Badge>
-                      )}
-                      {visit.patient?.allergies && Array.isArray(visit.patient.allergies) && visit.patient.allergies.length > 0 && (
-                        <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive text-[10px]">
-                          <AlertTriangle className="mr-1 h-2.5 w-2.5" /> Allergies
-                        </Badge>
+                        <Button
+                          size="sm"
+                          className="text-xs"
+                          onClick={(e) => { e.stopPropagation(); handleStartConsultation(visit); }}
+                        >
+                          <ArrowRight className="mr-1 h-3 w-3" />
+                          {visit.status === "waiting" ? "Start" : "Continue"}
+                        </Button>
                       )}
                     </div>
                   </div>
-
-                  {/* Right side */}
-                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                    <Badge variant="outline" className={statusColor(visit.status)}>
-                      {visit.status.replace("_", " ")}
-                    </Badge>
-                    {visit.status === "waiting" && (
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" /> {getWaitTime(visit.created_at)}
-                      </span>
-                    )}
-                    <Button
-                      size="sm"
-                      variant={visit.status === "completed" ? "outline" : "default"}
-                      className="text-xs"
-                      onClick={(e) => { e.stopPropagation(); handleStartConsultation(visit); }}
-                    >
-                      {visit.status === "waiting" && <><ArrowRight className="mr-1 h-3 w-3" /> Start</>}
-                      {visit.status === "in_progress" && <><ArrowRight className="mr-1 h-3 w-3" /> Continue</>}
-                      {visit.status === "completed" && <><Eye className="mr-1 h-3 w-3" /> View Notes</>}
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                </CardContent>
+              </Card>
+            );
+          })
         )}
       </div>
+
+      {/* View Notes Sheet */}
+      <Sheet open={notesOpen} onOpenChange={setNotesOpen}>
+        <SheetContent side="bottom" className="max-h-[80vh] overflow-auto rounded-t-2xl">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Lock className="h-4 w-4 text-muted-foreground" />
+              {notesVisit?.patient?.name} — Completed Notes
+            </SheetTitle>
+          </SheetHeader>
+          {notesLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
+          ) : notesData ? (
+            <div className="space-y-4 mt-4">
+              {notesData.soap?.subjective && (
+                <div><p className="text-xs font-semibold text-muted-foreground uppercase">Subjective</p><p className="text-sm">{notesData.soap.subjective}</p></div>
+              )}
+              {notesData.soap?.objective && (
+                <div><p className="text-xs font-semibold text-muted-foreground uppercase">Objective</p><p className="text-sm">{notesData.soap.objective}</p></div>
+              )}
+              {notesData.soap?.assessment && (
+                <div><p className="text-xs font-semibold text-muted-foreground uppercase">Assessment</p><p className="text-sm">{notesData.soap.assessment}</p></div>
+              )}
+              {notesData.soap?.plan && (
+                <div><p className="text-xs font-semibold text-muted-foreground uppercase">Plan</p><p className="text-sm">{notesData.soap.plan}</p></div>
+              )}
+              {notesData.medications.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Medications</p>
+                  <div className="space-y-1">
+                    {notesData.medications.map((m: any, i: number) => (
+                      <div key={i} className="text-sm flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5">
+                        <span className="font-medium">{i+1}. {m.name}</span>
+                        <span className="text-muted-foreground">{m.dosage}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {[m.morning && "M", m.afternoon && "A", m.evening && "E", m.night && "N"].filter(Boolean).join("/")}
+                        </span>
+                        {m.duration && <span className="text-xs text-muted-foreground">× {m.duration}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {notesData.investigations.length > 0 && (
+                <div><p className="text-xs font-semibold text-muted-foreground uppercase">Investigations</p><p className="text-sm">{notesData.investigations.join(", ")}</p></div>
+              )}
+              {notesData.follow_up_date && (
+                <div><p className="text-xs font-semibold text-muted-foreground uppercase">Follow-up</p><p className="text-sm">{new Date(notesData.follow_up_date).toLocaleDateString("en-IN", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</p></div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground py-4">No notes found for this visit.</p>
+          )}
+        </SheetContent>
+      </Sheet>
     </DashboardLayout>
   );
 }
