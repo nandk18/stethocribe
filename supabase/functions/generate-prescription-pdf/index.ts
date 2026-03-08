@@ -21,6 +21,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
   Odia: { clinic: "Daktarkhana", doctor: "Daktar", patient: "Rogi", date: "Tarikh", rx: "Prescription", followUp: "Parabarti Bhet", morning: "Sakala", afternoon: "Diprahar", evening: "Sandhya", night: "Ratri", investigations: "Pariksha", soap: "Chikitsa Note" },
   Assamese: { clinic: "Chikitsalay", doctor: "Chikitsok", patient: "Rogi", date: "Tarikh", rx: "Prescription", followUp: "Poroborti Sakkhat", morning: "Puwa", afternoon: "Duporiya", evening: "Abeli", night: "Rati", investigations: "Poriksha", soap: "Chikitsa Toka" },
   Urdu: { clinic: "Aspatal", doctor: "Doctor", patient: "Mariz", date: "Tarikh", rx: "Nuskha", followUp: "Agli Mulaqat", morning: "Subah", afternoon: "Dopehar", evening: "Shaam", night: "Raat", investigations: "Test", soap: "Tibbi Notes" },
+  Konkani: { clinic: "Hospital", doctor: "Doctor", patient: "Dukhi", date: "Tarikh", rx: "Prescription", followUp: "Fudli Bhet", morning: "Sokallim", afternoon: "Donparam", evening: "Sanjechim", night: "Ratim", investigations: "Tapaasni", soap: "Clinical Note" },
+  Manipuri: { clinic: "Hospital", doctor: "Doctor", patient: "Laina Leibak", date: "Tarik", rx: "Prescription", followUp: "Ahing Taba", morning: "Nungaiba", afternoon: "Nungthil", evening: "Numidang", night: "Ahan", investigations: "Test", soap: "Clinical Note" },
+  Sindhi: { clinic: "Aspatal", doctor: "Doctor", patient: "Mariz", date: "Tarikh", rx: "Nuskha", followUp: "Agli Mulaqat", morning: "Subho", afternoon: "Biapahri", evening: "Shaam", night: "Raat", investigations: "Jaanch", soap: "Tibbi Notes" },
 }
 
 serve(async (req) => {
