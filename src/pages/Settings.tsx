@@ -525,6 +525,39 @@ export default function Settings() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Delete Confirmation Dialog */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-background rounded-xl p-6 max-w-sm w-full shadow-xl border">
+            <h3 className="font-display font-semibold text-foreground mb-2">Remove Team Member</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Are you sure you want to remove <strong className="text-foreground">{confirmDeleteMember?.display_name}</strong> from the clinic?
+              They will lose access immediately.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1 rounded-lg"
+                onClick={() => setConfirmDeleteId(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1 rounded-lg"
+                onClick={() => handleRemoveStaff(confirmDeleteId)}
+                disabled={isRemoving === confirmDeleteId}
+              >
+                {isRemoving === confirmDeleteId
+                  ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Removing...</>
+                  : "Remove"
+                }
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }
