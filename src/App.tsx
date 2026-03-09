@@ -91,6 +91,7 @@ function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/rx/:prescriptionId" element={<PrescriptionViewer />} />
       <Route path="/dashboard" element={<DashboardComponent />} />
       <Route path="/dashboard/consultation/:visitId" element={
         role === "doctor" || role === "admin" ? <DoctorConsultationPage /> : <Navigate to="/dashboard" replace />
