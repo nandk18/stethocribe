@@ -16,6 +16,8 @@ export default function ReceptionistDashboard() {
         <p className="text-sm text-muted-foreground">Manage patient check-ins and today's queue</p>
       </div>
 
+      <TodayAppointmentsWidget />
+
       <Tabs defaultValue="queue" className="space-y-6">
         <TabsList>
           <TabsTrigger value="queue"><CalendarDays className="mr-2 h-4 w-4" /> Today's Queue</TabsTrigger>
