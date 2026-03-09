@@ -508,24 +508,31 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
               onTemplateChange={handleTemplateChange}
             />
           )}
-          {activeSections.map(section => {
-            const meta = SECTION_LABELS[section] || { 
-              label: section.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()), 
-              placeholder: `Enter ${section.replace(/_/g, " ")}...` 
-            };
-            return (
-              <div key={section} className="space-y-2">
-                <Label className="font-semibold">{meta.label}</Label>
-                <Textarea
-                  rows={3}
-                  value={noteFields[section] || ""}
-                  onChange={e => updateNoteField(section, e.target.value)}
-                  placeholder={meta.placeholder}
-                  className="rounded-lg"
-                />
-              </div>
-            );
-          })}
+          {isReformatting ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-primary">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span className="text-sm font-medium">Reformatting notes to {selectedTemplate?.name || "new template"}...</span>
+            </div>
+          ) : (
+            activeSections.map(section => {
+              const meta = SECTION_LABELS[section] || { 
+                label: section.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()), 
+                placeholder: `Enter ${section.replace(/_/g, " ")}...` 
+              };
+              return (
+                <div key={section} className="space-y-2">
+                  <Label className="font-semibold">{meta.label}</Label>
+                  <Textarea
+                    rows={3}
+                    value={noteFields[section] || ""}
+                    onChange={e => updateNoteField(section, e.target.value)}
+                    placeholder={meta.placeholder}
+                    className="rounded-lg"
+                  />
+                </div>
+              );
+            })
+          )}
         </CardContent>
       </Card>
     );
