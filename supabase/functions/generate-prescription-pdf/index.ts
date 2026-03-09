@@ -321,6 +321,10 @@ ${prescription.follow_up_date ? `
 
 <div class="signature">
   <div class="sig-line">
+    ${signatureDataUrl ? `
+    <img src="${signatureDataUrl}" alt="Signature"
+      style="height:50px;object-fit:contain;margin-bottom:4px;display:block;margin-left:auto;" />
+    ` : ""}
     <div class="sig-name">${escHtml(doctor?.name || "Doctor")}</div>
     ${doctorNameRegional ? `<div class="sig-detail regional">${doctorNameRegional}</div>` : ""}
     <div class="sig-detail">${escHtml(doctor?.qualification || "")}</div>
