@@ -89,8 +89,23 @@ export default function Settings() {
       setQualification(doctor.qualification || "");
       setRegNumber(doctor.registration_number || "");
       setSpecialty(doctor.specialty || "");
+      // Load signature
+      if (doctor.signature_url) {
+        supabase.storage.from("signatures").createSignedUrl(doctor.signature_url, 3600)
+          .then(({ data }) => { if (data?.signedUrl) setSignatureUrl(data.signedUrl); });
+      }
     }
   }, [doctor]);
+
+  useEffect(() => {
+    if (clinic) {
+      // Load logo
+      if ((clinic as any).logo_url) {
+        const { data } = supabase.storage.from("clinic-assets").getPublicUrl((clinic as any).logo_url);
+        if (data?.publicUrl) setLogoPreview(data.publicUrl);
+      }
+    }
+  }, [clinic]);
 
   useEffect(() => {
     if (user) fetchTeam();
