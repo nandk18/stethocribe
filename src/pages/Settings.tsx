@@ -321,6 +321,7 @@ export default function Settings() {
     } catch (err: any) { toast.error(err.message); }
   };
 
+  if (loading) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center py-20">
