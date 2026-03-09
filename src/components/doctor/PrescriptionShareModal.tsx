@@ -27,8 +27,8 @@ type Props = {
   };
 };
 
-export default function PrescriptionShareModal({ open, onClose, prescriptionPdfUrl, patient, clinicName, doctorName, emrExportProps }: Props) {
-  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+export default function PrescriptionShareModal({ open, onClose, prescriptionPdfUrl, prescriptionId, patient, clinicName, doctorName, emrExportProps }: Props) {
+  const viewerUrl = prescriptionId ? `${window.location.origin}/rx/${prescriptionId}` : null;
   const [loading, setLoading] = useState(false);
   const isMobile = useIsMobile();
 
