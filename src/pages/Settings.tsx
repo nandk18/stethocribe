@@ -429,6 +429,36 @@ export default function Settings() {
           </Card>
         )}
 
+        {/* Documentation */}
+        <Card className="rounded-2xl border-0 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 font-display">
+              <FileDown className="h-5 w-5 text-primary" /> Documentation
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Download product documentation for reference and onboarding.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <a
+                href="/STETHOSCRIBE_USER_GUIDE.md"
+                download
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                <FileDown className="h-4 w-4" /> User Guide
+              </a>
+              <a
+                href="/STETHOSCRIBE_TECHNICAL_REFERENCE.md"
+                download
+                className="inline-flex items-center gap-2 rounded-lg bg-muted px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/80 transition-colors"
+              >
+                <FileDown className="h-4 w-4" /> Technical Reference
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Mobile App */}
         <Card className="rounded-2xl border-0 shadow-sm">
           <CardHeader>
