@@ -81,35 +81,6 @@ const tabIcons = [User, History, Mic, FileText, Pill, Upload];
 // Default SOAP sections if no template selected
 const DEFAULT_SECTIONS = ["subjective", "objective", "assessment", "plan"];
 
-async function getDoctorForUser(userId: string, clinicId: string) {
-  const { data: doctor } = await supabase
-    .from("doctors")
-    .select("*")
-    .eq("user_id", userId)
-    .single();
-  if (doctor) return doctor;
-
-  // Auto-create doctor record for admin if missing
-  const { data: profileData } = await supabase
-    .from("profiles")
-    .select("full_name")
-    .eq("user_id", userId)
-    .single();
-
-  const { data: newDoctor } = await supabase
-    .from("doctors")
-    .insert({
-      clinic_id: clinicId,
-      user_id: userId,
-      name: profileData?.full_name || "Admin Doctor",
-      specialty: "General Medicine",
-    })
-    .select()
-    .single();
-
-  return newDoctor;
-}
-
 export default function ConsultationWorkspace({ visit, onComplete }: { visit: Visit; onComplete: () => void }) {
   const { profile } = useAuth();
   const { clinic, doctor } = useClinic();
@@ -129,22 +100,16 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
   const [enabledTemplateNames, setEnabledTemplateNames] = useState<string[]>(["SOAP Notes"]);
 
   useEffect(() => {
-    const fetchTemplates = async () => {
-      if (doctor) {
-        const { data } = await supabase.from("doctors").select("enabled_templates").eq("id", doctor.id).single();
-        if (data?.enabled_templates && Array.isArray(data.enabled_templates)) {
-          setEnabledTemplateNames(data.enabled_templates as string[]);
-        }
-      } else if (profile?.role === "admin" && profile?.user_id && profile?.clinic_id) {
-        // Admin without doctor record - try to find or auto-create
-        const dr = await getDoctorForUser(profile.user_id, profile.clinic_id);
-        if (dr?.enabled_templates && Array.isArray(dr.enabled_templates)) {
-          setEnabledTemplateNames(dr.enabled_templates as string[]);
-        }
-      }
-    };
-    fetchTemplates();
-  }, [doctor, profile?.role, profile?.user_id, profile?.clinic_id]);
+    if (doctor) {
+      // Fetch enabled templates from doctors table
+      supabase.from("doctors").select("enabled_templates").eq("id", doctor.id).single()
+        .then(({ data }) => {
+          if (data?.enabled_templates && Array.isArray(data.enabled_templates)) {
+            setEnabledTemplateNames(data.enabled_templates as string[]);
+          }
+        });
+    }
+  }, [doctor]);
 
   // Prescription
   const [medications, setMedications] = useState<Medication[]>([
@@ -239,7 +204,8 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
     }
     setSaving(true);
     try {
-      const doctorRow = await getDoctorForUser(profile!.user_id, profile!.clinic_id!);
+      const { data: doctorRow } = await supabase
+        .from("doctors").select("id").eq("user_id", profile!.user_id).single();
       if (!doctorRow) throw new Error("Doctor profile not found");
 
       const soapNotes = buildSoapNotes();

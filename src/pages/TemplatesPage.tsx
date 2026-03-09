@@ -22,52 +22,27 @@ const SYSTEM_TEMPLATES = [
   { name: "EKA EMR Format", description: "Compatible with EKA.care EMR system" },
 ];
 
-async function getDoctorForUserTemplates(userId: string, clinicId: string) {
-  const { data: dr } = await supabase
-    .from("doctors").select("*").eq("user_id", userId).single();
-  if (dr) return dr;
-  const { data: prof } = await supabase
-    .from("profiles").select("full_name").eq("user_id", userId).single();
-  const { data: newDr } = await supabase
-    .from("doctors")
-    .insert({ clinic_id: clinicId, user_id: userId, name: prof?.full_name || "Admin Doctor", specialty: "General Medicine" })
-    .select().single();
-  return newDr;
-}
-
 export default function TemplatesPage() {
   const { profile } = useAuth();
   const { doctor } = useClinic();
-  const [doctorRecord, setDoctorRecord] = useState<any>(null);
   const [enabledTemplates, setEnabledTemplates] = useState<string[]>(["SOAP Notes"]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("library");
 
   useEffect(() => {
-    const init = async () => {
-      if (doctor) {
-        setDoctorRecord(doctor);
-        await fetchDoctorTemplates(doctor.id);
-      } else if (profile?.role === "admin" && profile?.user_id && profile?.clinic_id) {
-        const dr = await getDoctorForUserTemplates(profile.user_id, profile.clinic_id);
-        if (dr) {
-          setDoctorRecord(dr);
-          await fetchDoctorTemplates(dr.id);
-        } else {
-          setLoading(false);
-        }
-      } else {
-        setLoading(false);
-      }
-    };
-    init();
-  }, [doctor, profile?.role, profile?.user_id, profile?.clinic_id]);
+    if (doctor) {
+      fetchDoctorTemplates();
+    } else {
+      setLoading(false);
+    }
+  }, [doctor]);
 
-  const fetchDoctorTemplates = async (doctorId: string) => {
+  const fetchDoctorTemplates = async () => {
+    if (!doctor) return;
     const { data } = await supabase
       .from("doctors")
       .select("enabled_templates")
-      .eq("id", doctorId)
+      .eq("id", doctor.id)
       .single();
     if (data?.enabled_templates) {
       setEnabledTemplates(data.enabled_templates as string[]);
@@ -76,7 +51,7 @@ export default function TemplatesPage() {
   };
 
   const toggleTemplate = async (templateName: string) => {
-    if (!doctorRecord) return;
+    if (!doctor) return;
     let updated: string[];
     if (enabledTemplates.includes(templateName)) {
       if (enabledTemplates.length <= 1) {
@@ -92,10 +67,10 @@ export default function TemplatesPage() {
     const { error } = await supabase
       .from("doctors")
       .update({ enabled_templates: updated } as any)
-      .eq("id", doctorRecord.id);
+      .eq("id", doctor.id);
     if (error) {
       toast.error("Failed to update templates");
-      fetchDoctorTemplates(doctorRecord.id);
+      fetchDoctorTemplates();
     }
   };
 
