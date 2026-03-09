@@ -68,6 +68,12 @@ export default function Settings() {
   const [editRegNumber, setEditRegNumber] = useState("");
   const [editSaving, setEditSaving] = useState(false);
 
+  // Logo & Signature
+  const [logoPreview, setLogoPreview] = useState("");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [signatureUrl, setSignatureUrl] = useState("");
+  const [uploadingSignature, setUploadingSignature] = useState(false);
+
   useEffect(() => {
     if (clinic) {
       setClinicName(clinic.name || "");
