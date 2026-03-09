@@ -100,7 +100,10 @@ export default function Settings() {
 
     const [profilesRes, doctorsRes] = await Promise.all([
       supabase.from("profiles").select("user_id, full_name, role, created_at")
-        .eq("clinic_id", myProfile.clinic_id).order("created_at", { ascending: true }),
+        .eq("clinic_id", myProfile.clinic_id)
+        .not("clinic_id", "is", null)
+        .not("role", "is", null)
+        .order("created_at", { ascending: true }),
       supabase.from("doctors").select("user_id, name, qualification, specialty, registration_number")
         .eq("clinic_id", myProfile.clinic_id),
     ]);
