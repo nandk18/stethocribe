@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Calendar, ChevronDown, FileText, Pill, ExternalLink, Loader2 } from "lucide-react";
+import VitalsTrends from "@/components/vitals/VitalsTrends";
 
 function PrescriptionLinkButton({ pdfUrl }: { pdfUrl: string }) {
   const [loading, setLoading] = useState(false);
@@ -101,6 +102,7 @@ export default function PatientHistory({ patientId, currentVisitId }: Props) {
 
   return (
     <div className="space-y-3">
+      <VitalsTrends patientId={patientId} />
       <p className="text-sm text-muted-foreground">{history.length} previous visit{history.length !== 1 ? "s" : ""}</p>
       {history.map(visit => {
         const soap = visit.clinical_notes?.[0]?.soap_notes;

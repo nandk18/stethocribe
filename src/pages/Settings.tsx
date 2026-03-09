@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
-import { Building2, User, Save, Loader2, UserPlus, Send, Smartphone, Shield, Users, Trash2, Globe, Pencil, FileDown } from "lucide-react";
+import { Building2, User, Save, Loader2, UserPlus, Send, Smartphone, Shield, Users, Trash2, Globe, Pencil, FileDown, Upload } from "lucide-react";
 
 const LANGUAGES = [
   "Tamil","Hindi","Telugu","Kannada","Malayalam","Marathi",
@@ -68,6 +68,12 @@ export default function Settings() {
   const [editRegNumber, setEditRegNumber] = useState("");
   const [editSaving, setEditSaving] = useState(false);
 
+  // Logo & Signature
+  const [logoPreview, setLogoPreview] = useState("");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [signatureUrl, setSignatureUrl] = useState("");
+  const [uploadingSignature, setUploadingSignature] = useState(false);
+
   useEffect(() => {
     if (clinic) {
       setClinicName(clinic.name || "");
@@ -83,8 +89,23 @@ export default function Settings() {
       setQualification(doctor.qualification || "");
       setRegNumber(doctor.registration_number || "");
       setSpecialty(doctor.specialty || "");
+      // Load signature
+      if (doctor.signature_url) {
+        supabase.storage.from("signatures").createSignedUrl(doctor.signature_url, 3600)
+          .then(({ data }) => { if (data?.signedUrl) setSignatureUrl(data.signedUrl); });
+      }
     }
   }, [doctor]);
+
+  useEffect(() => {
+    if (clinic) {
+      // Load logo
+      if ((clinic as any).logo_url) {
+        const { data } = supabase.storage.from("clinic-assets").getPublicUrl((clinic as any).logo_url);
+        if (data?.publicUrl) setLogoPreview(data.publicUrl);
+      }
+    }
+  }, [clinic]);
 
   useEffect(() => {
     if (user) fetchTeam();
@@ -250,6 +271,56 @@ export default function Settings() {
     finally { setEditSaving(false); }
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { toast.error("Logo must be under 3MB"); return; }
+    if (!profile?.clinic_id) return;
+    setUploadingLogo(true);
+    try {
+      const path = `${profile.clinic_id}/logo.${file.name.split(".").pop()}`;
+      const { error } = await supabase.storage.from("clinic-assets").upload(path, file, { upsert: true });
+      if (error) throw error;
+      await supabase.from("clinics").update({ logo_url: path } as any).eq("id", profile.clinic_id);
+      const { data } = supabase.storage.from("clinic-assets").getPublicUrl(path);
+      setLogoPreview(data.publicUrl);
+      toast.success("Logo uploaded");
+      refetch();
+    } catch (err: any) { toast.error("Upload failed: " + err.message); }
+    finally { setUploadingLogo(false); }
+  };
+
+  const handleSignatureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !doctor) return;
+    if (file.size > 2 * 1024 * 1024) { toast.error("Signature must be under 2MB"); return; }
+    setUploadingSignature(true);
+    try {
+      const path = `${doctor.id}/signature.${file.name.split(".").pop()}`;
+      const { error: uploadError } = await supabase.storage.from("signatures").upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      await supabase.from("doctors").update({ signature_url: path }).eq("id", doctor.id);
+      const { data } = await supabase.storage.from("signatures").createSignedUrl(path, 3600);
+      setSignatureUrl(data?.signedUrl || "");
+      toast.success("Signature uploaded successfully");
+      refetch();
+    } catch (err: any) { toast.error("Upload failed: " + err.message); }
+    finally { setUploadingSignature(false); }
+  };
+
+  const handleRemoveSignature = async () => {
+    if (!doctor) return;
+    try {
+      if (doctor.signature_url) {
+        await supabase.storage.from("signatures").remove([doctor.signature_url]);
+      }
+      await supabase.from("doctors").update({ signature_url: null }).eq("id", doctor.id);
+      setSignatureUrl("");
+      toast.success("Signature removed");
+      refetch();
+    } catch (err: any) { toast.error(err.message); }
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -288,6 +359,24 @@ export default function Settings() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Logo Upload */}
+            <div className="flex items-start gap-4 mb-4">
+              <div className="w-20 h-20 border-2 border-dashed border-border rounded-xl flex items-center justify-center overflow-hidden bg-muted/50">
+                {logoPreview ? (
+                  <img src={logoPreview} alt="Logo" className="w-full h-full object-contain p-1" />
+                ) : (
+                  <Building2 className="w-8 h-8 text-muted-foreground/30" />
+                )}
+              </div>
+              <div>
+                <label className="cursor-pointer bg-primary text-primary-foreground text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2 w-fit">
+                  <Upload className="w-4 h-4" />
+                  {uploadingLogo ? "Uploading..." : logoPreview ? "Change Logo" : "Upload Logo"}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} disabled={uploadingLogo} />
+                </label>
+                <p className="text-xs text-muted-foreground mt-1.5">PNG or JPG, max 3MB. Appears on prescription header</p>
+              </div>
+            </div>
             <div className="space-y-2"><Label>Clinic Name</Label><Input value={clinicName} onChange={e => setClinicName(e.target.value)} className="rounded-lg" /></div>
             <div className="space-y-2"><Label>Address</Label><Input value={clinicAddress} onChange={e => setClinicAddress(e.target.value)} className="rounded-lg" /></div>
             <div className="space-y-2"><Label>Phone</Label><Input value={clinicPhone} onChange={e => setClinicPhone(e.target.value)} className="rounded-lg" /></div>
@@ -325,6 +414,32 @@ export default function Settings() {
                 <div className="space-y-2"><Label>Specialty</Label><Input value={specialty} onChange={e => setSpecialty(e.target.value)} placeholder="General Medicine" className="rounded-lg" /></div>
               </div>
               <div className="space-y-2"><Label>Registration Number</Label><Input value={regNumber} onChange={e => setRegNumber(e.target.value)} placeholder="MCI-123456" className="rounded-lg" /></div>
+              {/* Signature Upload */}
+              <div className="space-y-2">
+                <Label className="block text-sm font-semibold">Doctor Signature</Label>
+                {signatureUrl ? (
+                  <div className="border border-border rounded-lg p-3 inline-block bg-muted/50 mb-2">
+                    <img src={signatureUrl} alt="Signature" className="h-16 object-contain" />
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-border rounded-lg p-6 text-center mb-2">
+                    <p className="text-sm text-muted-foreground">No signature uploaded</p>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <label className="cursor-pointer bg-primary text-primary-foreground text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2">
+                    <Upload className="w-4 h-4" />
+                    {uploadingSignature ? "Uploading..." : signatureUrl ? "Change Signature" : "Upload Signature"}
+                    <input type="file" accept="image/png,image/jpeg,image/jpg" className="hidden" onChange={handleSignatureUpload} disabled={uploadingSignature} />
+                  </label>
+                  {signatureUrl && (
+                    <Button variant="outline" size="sm" className="text-destructive border-destructive/30" onClick={handleRemoveSignature}>
+                      Remove
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">PNG or JPG, transparent background recommended. Used on prescriptions.</p>
+              </div>
               <Button onClick={handleSaveDoctor} disabled={saving} className="rounded-lg">
                 <Save className="mr-2 h-4 w-4" /> {doctor ? "Update" : "Create"} Doctor Profile
               </Button>

@@ -108,6 +108,36 @@ serve(async (req) => {
       console.log("Transliterated clinic:", clinicNameRegional, "doctor:", doctorNameRegional)
     }
 
+    // Fetch clinic logo
+    let logoDataUrl = ""
+    if (clinic?.logo_url) {
+      try {
+        const { data: logoData } = supabaseAdmin.storage.from("clinic-assets").getPublicUrl(clinic.logo_url)
+        if (logoData?.publicUrl) {
+          const logoRes = await fetch(logoData.publicUrl)
+          const logoBuffer = await logoRes.arrayBuffer()
+          const logoBase64 = btoa(String.fromCharCode(...new Uint8Array(logoBuffer)))
+          const logoMime = clinic.logo_url.endsWith(".png") ? "image/png" : "image/jpeg"
+          logoDataUrl = `data:${logoMime};base64,${logoBase64}`
+        }
+      } catch { /* logo fetch failed, skip */ }
+    }
+
+    // Fetch doctor signature
+    let signatureDataUrl = ""
+    if (doctor?.signature_url) {
+      try {
+        const { data: sigData } = await supabaseAdmin.storage.from("signatures").createSignedUrl(doctor.signature_url, 3600)
+        if (sigData?.signedUrl) {
+          const sigRes = await fetch(sigData.signedUrl)
+          const sigBuffer = await sigRes.arrayBuffer()
+          const sigBase64 = btoa(String.fromCharCode(...new Uint8Array(sigBuffer)))
+          const sigMime = doctor.signature_url.endsWith(".png") ? "image/png" : "image/jpeg"
+          signatureDataUrl = `data:${sigMime};base64,${sigBase64}`
+        }
+      } catch { /* signature fetch failed */ }
+    }
+
     const checkmark = (val: boolean) => val
       ? `<span style="color:#0D6E6E;font-weight:700;">✓</span>`
       : `<span style="color:#ccc;">—</span>`
@@ -169,12 +199,18 @@ serve(async (req) => {
 <body>
 
 <div class="header">
-  <div class="clinic-block">
-    <div class="clinic-name">${escHtml(clinic?.name || "Clinic")}</div>
-    ${clinicNameRegional ? `<div class="clinic-regional regional">${clinicNameRegional}</div>` : ""}
-    <div class="clinic-sub">
-      ${escHtml(clinic?.address || "")}<br>
-      ${clinic?.phone ? "Tel: " + escHtml(clinic.phone) : ""}
+  <div class="clinic-block" style="display:flex;align-items:center;gap:12px;">
+    ${logoDataUrl ? `
+    <img src="${logoDataUrl}" alt="Logo"
+      style="width:56px;height:56px;object-fit:contain;border-radius:6px;background:white;padding:2px;flex-shrink:0;" />
+    ` : ""}
+    <div>
+      <div class="clinic-name">${escHtml(clinic?.name || "Clinic")}</div>
+      ${clinicNameRegional ? `<div class="clinic-regional regional">${clinicNameRegional}</div>` : ""}
+      <div class="clinic-sub">
+        ${escHtml(clinic?.address || "")}<br>
+        ${clinic?.phone ? "Tel: " + escHtml(clinic.phone) : ""}
+      </div>
     </div>
   </div>
   <div class="doctor-block">
@@ -285,6 +321,10 @@ ${prescription.follow_up_date ? `
 
 <div class="signature">
   <div class="sig-line">
+    ${signatureDataUrl ? `
+    <img src="${signatureDataUrl}" alt="Signature"
+      style="height:50px;object-fit:contain;margin-bottom:4px;display:block;margin-left:auto;" />
+    ` : ""}
     <div class="sig-name">${escHtml(doctor?.name || "Doctor")}</div>
     ${doctorNameRegional ? `<div class="sig-detail regional">${doctorNameRegional}</div>` : ""}
     <div class="sig-detail">${escHtml(doctor?.qualification || "")}</div>

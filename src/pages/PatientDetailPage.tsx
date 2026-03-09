@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ArrowLeft, Calendar, ChevronDown, FileText, Pill, ExternalLink, Loader2, Phone, Mail, AlertTriangle, Activity, User, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import VitalsTrends from "@/components/vitals/VitalsTrends";
 
 function PrescriptionLinkButton({ pdfUrl }: { pdfUrl: string }) {
   const [loading, setLoading] = useState(false);
@@ -192,6 +193,9 @@ export default function PatientDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Vitals Trends */}
+      {patientId && <VitalsTrends patientId={patientId} />}
 
       {/* Visit History */}
       <h2 className="font-display text-lg font-semibold text-foreground mb-3">Visit History</h2>

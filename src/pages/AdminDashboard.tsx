@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { CalendarDays, Stethoscope, UserPlus, Clock, AlertTriangle, ArrowRight, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import TodayAppointmentsWidget from "@/components/appointments/TodayAppointmentsWidget";
 
 type Visit = {
   id: string;
@@ -80,6 +81,7 @@ function AdminQueueView() {
 
   return (
     <Tabs defaultValue="reception" className="space-y-4">
+      <TodayAppointmentsWidget />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <TabsList className="w-full sm:w-auto overflow-x-auto">
           <TabsTrigger value="reception"><CalendarDays className="mr-2 h-4 w-4" /> Reception View</TabsTrigger>

@@ -19,6 +19,7 @@ import PatientDetailPage from "./pages/PatientDetailPage";
 import Settings from "./pages/Settings";
 import TemplatesPage from "./pages/TemplatesPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
+import AppointmentsPage from "./pages/AppointmentsPage";
 import NotFound from "./pages/NotFound";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -101,6 +102,9 @@ function AppRoutes() {
       <Route path="/dashboard/patients/:patientId" element={<PatientDetailPage />} />
       <Route path="/dashboard/templates" element={<TemplatesPage />} />
       <Route path="/dashboard/analytics" element={role === "admin" ? <AnalyticsPage /> : <Navigate to="/dashboard" replace />} />
+      <Route path="/dashboard/appointments" element={
+        role === "admin" || role === "receptionist" ? <AppointmentsPage /> : <Navigate to="/dashboard" replace />
+      } />
       <Route path="/dashboard/settings" element={<Settings />} />
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
