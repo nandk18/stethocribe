@@ -455,6 +455,7 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
         open={shareOpen}
         onClose={() => { setShareOpen(false); onComplete(); }}
         prescriptionPdfUrl={sharePdfUrl}
+        prescriptionId={sharePrescriptionId}
         patient={visit.patient ? {
           name: visit.patient.name, phone: visit.patient.phone || null,
           email: visit.patient.email || null, healthcare_id: visit.patient.healthcare_id || null,
