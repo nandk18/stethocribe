@@ -200,11 +200,12 @@ export default function Settings() {
   const handleRemoveStaff = async (userId: string) => {
     setIsRemoving(userId);
     try {
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({ clinic_id: null })
-        .eq("user_id", userId);
-      if (profileError) throw profileError;
+      const { data, error } = await supabase.functions.invoke("remove-staff", {
+        body: { target_user_id: userId }
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       toast.success("Team member removed successfully");
       setTeamMembers(prev => prev.filter(m => m.user_id !== userId));
