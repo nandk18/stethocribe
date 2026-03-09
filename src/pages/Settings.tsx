@@ -414,6 +414,32 @@ export default function Settings() {
                 <div className="space-y-2"><Label>Specialty</Label><Input value={specialty} onChange={e => setSpecialty(e.target.value)} placeholder="General Medicine" className="rounded-lg" /></div>
               </div>
               <div className="space-y-2"><Label>Registration Number</Label><Input value={regNumber} onChange={e => setRegNumber(e.target.value)} placeholder="MCI-123456" className="rounded-lg" /></div>
+              {/* Signature Upload */}
+              <div className="space-y-2">
+                <Label className="block text-sm font-semibold">Doctor Signature</Label>
+                {signatureUrl ? (
+                  <div className="border border-border rounded-lg p-3 inline-block bg-muted/50 mb-2">
+                    <img src={signatureUrl} alt="Signature" className="h-16 object-contain" />
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-border rounded-lg p-6 text-center mb-2">
+                    <p className="text-sm text-muted-foreground">No signature uploaded</p>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <label className="cursor-pointer bg-primary text-primary-foreground text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2">
+                    <Upload className="w-4 h-4" />
+                    {uploadingSignature ? "Uploading..." : signatureUrl ? "Change Signature" : "Upload Signature"}
+                    <input type="file" accept="image/png,image/jpeg,image/jpg" className="hidden" onChange={handleSignatureUpload} disabled={uploadingSignature} />
+                  </label>
+                  {signatureUrl && (
+                    <Button variant="outline" size="sm" className="text-destructive border-destructive/30" onClick={handleRemoveSignature}>
+                      Remove
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">PNG or JPG, transparent background recommended. Used on prescriptions.</p>
+              </div>
               <Button onClick={handleSaveDoctor} disabled={saving} className="rounded-lg">
                 <Save className="mr-2 h-4 w-4" /> {doctor ? "Update" : "Create"} Doctor Profile
               </Button>
