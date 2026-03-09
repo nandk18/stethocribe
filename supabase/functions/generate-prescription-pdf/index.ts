@@ -108,6 +108,36 @@ serve(async (req) => {
       console.log("Transliterated clinic:", clinicNameRegional, "doctor:", doctorNameRegional)
     }
 
+    // Fetch clinic logo
+    let logoDataUrl = ""
+    if (clinic?.logo_url) {
+      try {
+        const { data: logoData } = supabaseAdmin.storage.from("clinic-assets").getPublicUrl(clinic.logo_url)
+        if (logoData?.publicUrl) {
+          const logoRes = await fetch(logoData.publicUrl)
+          const logoBuffer = await logoRes.arrayBuffer()
+          const logoBase64 = btoa(String.fromCharCode(...new Uint8Array(logoBuffer)))
+          const logoMime = clinic.logo_url.endsWith(".png") ? "image/png" : "image/jpeg"
+          logoDataUrl = `data:${logoMime};base64,${logoBase64}`
+        }
+      } catch { /* logo fetch failed, skip */ }
+    }
+
+    // Fetch doctor signature
+    let signatureDataUrl = ""
+    if (doctor?.signature_url) {
+      try {
+        const { data: sigData } = await supabaseAdmin.storage.from("signatures").createSignedUrl(doctor.signature_url, 3600)
+        if (sigData?.signedUrl) {
+          const sigRes = await fetch(sigData.signedUrl)
+          const sigBuffer = await sigRes.arrayBuffer()
+          const sigBase64 = btoa(String.fromCharCode(...new Uint8Array(sigBuffer)))
+          const sigMime = doctor.signature_url.endsWith(".png") ? "image/png" : "image/jpeg"
+          signatureDataUrl = `data:${sigMime};base64,${sigBase64}`
+        }
+      } catch { /* signature fetch failed */ }
+    }
+
     const checkmark = (val: boolean) => val
       ? `<span style="color:#0D6E6E;font-weight:700;">✓</span>`
       : `<span style="color:#ccc;">—</span>`
