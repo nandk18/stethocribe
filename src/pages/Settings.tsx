@@ -359,6 +359,24 @@ export default function Settings() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Logo Upload */}
+            <div className="flex items-start gap-4 mb-4">
+              <div className="w-20 h-20 border-2 border-dashed border-border rounded-xl flex items-center justify-center overflow-hidden bg-muted/50">
+                {logoPreview ? (
+                  <img src={logoPreview} alt="Logo" className="w-full h-full object-contain p-1" />
+                ) : (
+                  <Building2 className="w-8 h-8 text-muted-foreground/30" />
+                )}
+              </div>
+              <div>
+                <label className="cursor-pointer bg-primary text-primary-foreground text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2 w-fit">
+                  <Upload className="w-4 h-4" />
+                  {uploadingLogo ? "Uploading..." : logoPreview ? "Change Logo" : "Upload Logo"}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} disabled={uploadingLogo} />
+                </label>
+                <p className="text-xs text-muted-foreground mt-1.5">PNG or JPG, max 3MB. Appears on prescription header</p>
+              </div>
+            </div>
             <div className="space-y-2"><Label>Clinic Name</Label><Input value={clinicName} onChange={e => setClinicName(e.target.value)} className="rounded-lg" /></div>
             <div className="space-y-2"><Label>Address</Label><Input value={clinicAddress} onChange={e => setClinicAddress(e.target.value)} className="rounded-lg" /></div>
             <div className="space-y-2"><Label>Phone</Label><Input value={clinicPhone} onChange={e => setClinicPhone(e.target.value)} className="rounded-lg" /></div>
