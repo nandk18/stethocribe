@@ -132,18 +132,67 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
 
   const vitals = visit.vitals || {};
 
-  const handleTemplateChange = (template: any) => {
+  const handleTemplateChange = async (template: any) => {
+    const previousValues = { ...noteFields };
+    const hasContent = Object.values(previousValues).some(v => v && v.trim().length > 0);
+    const newSections: string[] = template?.sections && Array.isArray(template.sections) ? template.sections : DEFAULT_SECTIONS;
+
     setSelectedTemplate(template);
-    if (template?.sections && Array.isArray(template.sections)) {
-      setActiveSections(template.sections);
-      // Initialize any missing note fields
-      const newFields = { ...noteFields };
-      template.sections.forEach((s: string) => {
-        if (!(s in newFields)) newFields[s] = "";
-      });
+    setActiveSections(newSections);
+
+    if (!hasContent) {
+      // No content yet, just switch fields to new template
+      const newFields: Record<string, string> = {};
+      newSections.forEach(s => { newFields[s] = ""; });
       setNoteFields(newFields);
-    } else {
-      setActiveSections(DEFAULT_SECTIONS);
+      return;
+    }
+
+    // Has content — use AI to reformat into new template
+    setIsReformatting(true);
+    try {
+      const existingContent = Object.entries(previousValues)
+        .filter(([_, v]) => v && v.trim())
+        .map(([k, v]) => {
+          const meta = SECTION_LABELS[k];
+          const label = meta ? meta.label : k.replace(/_/g, " ");
+          return `${label}: ${v}`;
+        })
+        .join("\n\n");
+
+      const fieldDefinitions = newSections.map(s => {
+        const meta = SECTION_LABELS[s] || {
+          label: s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+          placeholder: `Enter ${s.replace(/_/g, " ")}...`,
+        };
+        return { key: s, label: meta.label, placeholder: meta.placeholder };
+      });
+
+      const { data, error } = await supabase.functions.invoke("reformat-notes", {
+        body: {
+          existing_content: existingContent,
+          new_template_name: template?.name || "SOAP Notes",
+          field_definitions: fieldDefinitions,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const mapped: Record<string, string> = {};
+      newSections.forEach(s => {
+        mapped[s] = data[s] || "";
+      });
+      setNoteFields(mapped);
+      toast.success(`Notes reformatted to ${template?.name || "new template"}`);
+    } catch (err: any) {
+      console.error("Reformat error:", err);
+      toast.error("Could not reformat notes, showing empty fields");
+      const emptyFields: Record<string, string> = {};
+      newSections.forEach(s => { emptyFields[s] = ""; });
+      setNoteFields(emptyFields);
+    } finally {
+      setIsReformatting(false);
     }
   };
 
