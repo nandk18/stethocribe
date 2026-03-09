@@ -199,12 +199,18 @@ serve(async (req) => {
 <body>
 
 <div class="header">
-  <div class="clinic-block">
-    <div class="clinic-name">${escHtml(clinic?.name || "Clinic")}</div>
-    ${clinicNameRegional ? `<div class="clinic-regional regional">${clinicNameRegional}</div>` : ""}
-    <div class="clinic-sub">
-      ${escHtml(clinic?.address || "")}<br>
-      ${clinic?.phone ? "Tel: " + escHtml(clinic.phone) : ""}
+  <div class="clinic-block" style="display:flex;align-items:center;gap:12px;">
+    ${logoDataUrl ? `
+    <img src="${logoDataUrl}" alt="Logo"
+      style="width:56px;height:56px;object-fit:contain;border-radius:6px;background:white;padding:2px;flex-shrink:0;" />
+    ` : ""}
+    <div>
+      <div class="clinic-name">${escHtml(clinic?.name || "Clinic")}</div>
+      ${clinicNameRegional ? `<div class="clinic-regional regional">${clinicNameRegional}</div>` : ""}
+      <div class="clinic-sub">
+        ${escHtml(clinic?.address || "")}<br>
+        ${clinic?.phone ? "Tel: " + escHtml(clinic.phone) : ""}
+      </div>
     </div>
   </div>
   <div class="doctor-block">
