@@ -77,7 +77,7 @@ export default function AppointmentsPage() {
     if (!profile?.clinic_id) return;
     const startDate = format(weekStart, "yyyy-MM-dd");
     const endDate = format(addDays(weekStart, 6), "yyyy-MM-dd");
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from("appointments")
       .select("*, patients(name, healthcare_id, phone), doctors(name)")
       .eq("clinic_id", profile.clinic_id)
