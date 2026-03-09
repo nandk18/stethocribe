@@ -78,6 +78,7 @@ function AppRoutes() {
   if (!clinicReady) {
     return (
       <Routes>
+        <Route path="/rx/:prescriptionId" element={<PrescriptionViewer />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="*" element={<Navigate to="/onboarding" replace />} />
       </Routes>
