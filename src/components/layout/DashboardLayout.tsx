@@ -24,6 +24,7 @@ const doctorLinks = [
 const adminLinks = [
   { to: "/dashboard", icon: CalendarDays, label: "Queue" },
   { to: "/dashboard/patients", icon: Users, label: "Patients" },
+  { to: "/dashboard/templates", icon: FileText, label: "Templates" },
   { to: "/dashboard/settings", icon: Settings, label: "Settings" },
 ];
 
