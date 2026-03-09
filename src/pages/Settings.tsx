@@ -271,7 +271,56 @@ export default function Settings() {
     finally { setEditSaving(false); }
   };
 
-  if (loading) {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { toast.error("Logo must be under 3MB"); return; }
+    if (!profile?.clinic_id) return;
+    setUploadingLogo(true);
+    try {
+      const path = `${profile.clinic_id}/logo.${file.name.split(".").pop()}`;
+      const { error } = await supabase.storage.from("clinic-assets").upload(path, file, { upsert: true });
+      if (error) throw error;
+      await supabase.from("clinics").update({ logo_url: path } as any).eq("id", profile.clinic_id);
+      const { data } = supabase.storage.from("clinic-assets").getPublicUrl(path);
+      setLogoPreview(data.publicUrl);
+      toast.success("Logo uploaded");
+      refetch();
+    } catch (err: any) { toast.error("Upload failed: " + err.message); }
+    finally { setUploadingLogo(false); }
+  };
+
+  const handleSignatureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !doctor) return;
+    if (file.size > 2 * 1024 * 1024) { toast.error("Signature must be under 2MB"); return; }
+    setUploadingSignature(true);
+    try {
+      const path = `${doctor.id}/signature.${file.name.split(".").pop()}`;
+      const { error: uploadError } = await supabase.storage.from("signatures").upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      await supabase.from("doctors").update({ signature_url: path }).eq("id", doctor.id);
+      const { data } = await supabase.storage.from("signatures").createSignedUrl(path, 3600);
+      setSignatureUrl(data?.signedUrl || "");
+      toast.success("Signature uploaded successfully");
+      refetch();
+    } catch (err: any) { toast.error("Upload failed: " + err.message); }
+    finally { setUploadingSignature(false); }
+  };
+
+  const handleRemoveSignature = async () => {
+    if (!doctor) return;
+    try {
+      if (doctor.signature_url) {
+        await supabase.storage.from("signatures").remove([doctor.signature_url]);
+      }
+      await supabase.from("doctors").update({ signature_url: null }).eq("id", doctor.id);
+      setSignatureUrl("");
+      toast.success("Signature removed");
+      refetch();
+    } catch (err: any) { toast.error(err.message); }
+  };
+
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center py-20">
