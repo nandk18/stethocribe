@@ -56,6 +56,8 @@ export default function Settings() {
 
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loadingTeam, setLoadingTeam] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [isRemoving, setIsRemoving] = useState<string | null>(null);
 
   // Edit panel
   const [editOpen, setEditOpen] = useState(false);
@@ -98,7 +100,10 @@ export default function Settings() {
 
     const [profilesRes, doctorsRes] = await Promise.all([
       supabase.from("profiles").select("user_id, full_name, role, created_at")
-        .eq("clinic_id", myProfile.clinic_id).order("created_at", { ascending: true }),
+        .eq("clinic_id", myProfile.clinic_id)
+        .not("clinic_id", "is", null)
+        .not("role", "is", null)
+        .order("created_at", { ascending: true }),
       supabase.from("doctors").select("user_id, name, qualification, specialty, registration_number")
         .eq("clinic_id", myProfile.clinic_id),
     ]);
@@ -192,14 +197,27 @@ export default function Settings() {
     finally { setChangingPassword(false); }
   };
 
-  const handleRemoveStaff = async (userId: string, name: string) => {
-    if (!confirm(`Remove ${name || "this member"} from the clinic?`)) return;
+  const handleRemoveStaff = async (userId: string) => {
+    setIsRemoving(userId);
     try {
-      await supabase.from("profiles").update({ clinic_id: null }).eq("user_id", userId);
-      toast.success("Staff member removed");
-      fetchTeam();
-    } catch (err: any) { toast.error(err.message); }
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ clinic_id: null })
+        .eq("user_id", userId);
+      if (profileError) throw profileError;
+
+      toast.success("Team member removed successfully");
+      setTeamMembers(prev => prev.filter(m => m.user_id !== userId));
+      await fetchTeam();
+    } catch (err: any) {
+      toast.error("Failed to remove: " + err.message);
+    } finally {
+      setIsRemoving(null);
+      setConfirmDeleteId(null);
+    }
   };
+
+  const confirmDeleteMember = teamMembers.find(m => m.user_id === confirmDeleteId);
 
   const openEditPanel = (member: TeamMember) => {
     setEditMember(member);
@@ -411,7 +429,7 @@ export default function Settings() {
                                   <Button
                                     variant="ghost" size="sm"
                                     className="text-destructive hover:text-destructive"
-                                    onClick={() => handleRemoveStaff(member.user_id, member.display_name)}
+                                    onClick={() => setConfirmDeleteId(member.user_id)}
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
@@ -507,6 +525,39 @@ export default function Settings() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Delete Confirmation Dialog */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-background rounded-xl p-6 max-w-sm w-full shadow-xl border">
+            <h3 className="font-display font-semibold text-foreground mb-2">Remove Team Member</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Are you sure you want to remove <strong className="text-foreground">{confirmDeleteMember?.display_name}</strong> from the clinic?
+              They will lose access immediately.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1 rounded-lg"
+                onClick={() => setConfirmDeleteId(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1 rounded-lg"
+                onClick={() => handleRemoveStaff(confirmDeleteId)}
+                disabled={isRemoving === confirmDeleteId}
+              >
+                {isRemoving === confirmDeleteId
+                  ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Removing...</>
+                  : "Remove"
+                }
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }
