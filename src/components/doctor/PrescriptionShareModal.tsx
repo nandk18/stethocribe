@@ -12,6 +12,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   prescriptionPdfUrl: string | null;
+  prescriptionId: string | null;
   patient: { name: string; phone: string | null; email: string | null; healthcare_id: string | null } | null;
   clinicName: string;
   doctorName: string;

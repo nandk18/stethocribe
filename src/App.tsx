@@ -55,6 +55,7 @@ function AppRoutes() {
   if (!session) {
     return (
       <Routes>
+        <Route path="/rx/:prescriptionId" element={<PrescriptionViewer />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/accept-invite" element={<AcceptInvite />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
