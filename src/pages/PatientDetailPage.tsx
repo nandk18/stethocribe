@@ -6,8 +6,10 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ArrowLeft, Calendar, ChevronDown, FileText, Pill, ExternalLink, Loader2, Phone, Mail, AlertTriangle, Activity, User } from "lucide-react";
+import { ArrowLeft, Calendar, ChevronDown, FileText, Pill, ExternalLink, Loader2, Phone, Mail, AlertTriangle, Activity, User, Trash2 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 function PrescriptionLinkButton({ pdfUrl }: { pdfUrl: string }) {
   const [loading, setLoading] = useState(false);
@@ -17,7 +19,6 @@ function PrescriptionLinkButton({ pdfUrl }: { pdfUrl: string }) {
       const { data } = await supabase.storage.from("prescriptions").createSignedUrl(pdfUrl, 600);
       if (data?.signedUrl) {
         if (pdfUrl.endsWith(".html")) {
-          // Fetch HTML content and open via blob URL to bypass Supabase CSP sandbox
           const res = await fetch(data.signedUrl);
           const html = await res.text();
           const blob = new Blob([html], { type: "text/html;charset=utf-8" });
@@ -57,6 +58,10 @@ export default function PatientDetailPage() {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [visits, setVisits] = useState<HistoryVisit[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const isAdmin = profile?.role === "admin";
 
   const getAge = (dob: string | null) => {
     if (!dob) return null;
@@ -65,7 +70,7 @@ export default function PatientDetailPage() {
 
   useEffect(() => {
     if (!patientId || !profile?.clinic_id) return;
-    const fetch = async () => {
+    const fetchData = async () => {
       setLoading(true);
       const [patientRes, visitsRes] = await Promise.all([
         supabase.from("patients").select("*").eq("id", patientId).eq("clinic_id", profile.clinic_id).single(),
@@ -85,8 +90,40 @@ export default function PatientDetailPage() {
       }
       setLoading(false);
     };
-    fetch();
+    fetchData();
   }, [patientId, profile?.clinic_id]);
+
+  const handleDeletePatient = async () => {
+    if (!patientId) return;
+    setIsDeleting(true);
+    try {
+      const { data: visitData } = await supabase.from("visits").select("id").eq("patient_id", patientId);
+      const visitIds = visitData?.map(v => v.id) || [];
+
+      if (visitIds.length > 0) {
+        const { data: prescriptions } = await supabase.from("prescriptions").select("id").in("visit_id", visitIds);
+        const prescriptionIds = prescriptions?.map(p => p.id) || [];
+
+        if (prescriptionIds.length > 0) {
+          await supabase.from("document_shares").delete().in("prescription_id", prescriptionIds);
+        }
+        await supabase.from("prescriptions").delete().in("visit_id", visitIds);
+        await supabase.from("clinical_notes").delete().in("visit_id", visitIds);
+        await supabase.from("patient_documents").delete().in("visit_id", visitIds);
+        await supabase.from("visits").delete().eq("patient_id", patientId);
+      }
+
+      await supabase.from("patient_documents").delete().eq("patient_id", patientId);
+      await supabase.from("patients").delete().eq("id", patientId);
+
+      toast({ title: "Patient record deleted permanently" });
+      navigate("/dashboard/patients");
+    } catch (err: any) {
+      toast({ title: "Failed to delete", description: err.message, variant: "destructive" });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -111,9 +148,16 @@ export default function PatientDetailPage() {
 
   return (
     <DashboardLayout>
-      <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate("/dashboard/patients")}>
-        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Patients
-      </Button>
+      <div className="flex items-center justify-between mb-4">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard/patients")}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Patients
+        </Button>
+        {isAdmin && (
+          <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setDeleteOpen(true)}>
+            <Trash2 className="mr-2 h-4 w-4" /> Delete Patient
+          </Button>
+        )}
+      </div>
 
       {/* Patient Header */}
       <Card className="shadow-card mb-6">
@@ -228,6 +272,35 @@ export default function PatientDetailPage() {
           })}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" /> Delete Patient Record
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to permanently delete <strong className="text-foreground">{patient.name}</strong> ({patient.healthcare_id})?
+          </p>
+          <div className="text-xs text-destructive bg-destructive/10 rounded-lg p-3 mt-1 border border-destructive/20">
+            ⚠️ This will permanently delete all visits, clinical notes, prescriptions, and documents for this patient. This cannot be undone.
+          </div>
+          <div className="flex gap-3 mt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setDeleteOpen(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              className="flex-1"
+              onClick={handleDeletePatient}
+              disabled={isDeleting}
+            >
+              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              Delete Permanently
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

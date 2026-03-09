@@ -5,10 +5,10 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Clock, AlertTriangle, Stethoscope, ArrowRight, Eye, Lock } from "lucide-react";
+import { Clock, AlertTriangle, Stethoscope, ArrowRight, Eye, Lock, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type Visit = {
   id: string;
@@ -31,6 +31,7 @@ type CompletedNotes = {
 export default function DoctorDashboard() {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [visits, setVisits] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
@@ -67,7 +68,7 @@ export default function DoctorDashboard() {
   }, [fetchVisits]);
 
   const handleStartConsultation = async (visit: Visit) => {
-    if (visit.status === "completed") return; // Block completed
+    if (visit.status === "completed") return;
     if (visit.status === "waiting") {
       await supabase.from("visits").update({ status: "in_progress" }).eq("id", visit.id);
     }
@@ -121,6 +122,13 @@ export default function DoctorDashboard() {
     completed: visits.filter(v => v.status === "completed").length,
   };
 
+  const filterTabs = [
+    { key: "all", label: "All", count: counts.all },
+    { key: "waiting", label: "Waiting", count: counts.waiting },
+    { key: "in_progress", label: "In Progress", count: counts.in_progress },
+    { key: "completed", label: "Completed", count: counts.completed },
+  ];
+
   return (
     <DashboardLayout>
       <div className="mb-6">
@@ -135,14 +143,22 @@ export default function DoctorDashboard() {
         </div>
       </div>
 
-      <Tabs value={filter} onValueChange={setFilter} className="mb-6">
-        <TabsList>
-          <TabsTrigger value="all">All ({counts.all})</TabsTrigger>
-          <TabsTrigger value="waiting">Waiting ({counts.waiting})</TabsTrigger>
-          <TabsTrigger value="in_progress">In Progress ({counts.in_progress})</TabsTrigger>
-          <TabsTrigger value="completed">Completed ({counts.completed})</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      {/* Filter tabs — horizontally scrollable on mobile */}
+      <div className="mb-6 flex gap-2 overflow-x-auto pb-1 scrollbar-hide px-1">
+        {filterTabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setFilter(tab.key)}
+            className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full font-medium transition-all ${
+              filter === tab.key
+                ? "bg-primary text-primary-foreground"
+                : "bg-background text-muted-foreground border border-border"
+            }`}
+          >
+            {tab.label} ({tab.count})
+          </button>
+        ))}
+      </div>
 
       <div className="space-y-3">
         {loading ? (
@@ -155,6 +171,67 @@ export default function DoctorDashboard() {
         ) : (
           filteredVisits.map(visit => {
             const isCompleted = visit.status === "completed";
+            const hasVitals = visit.vitals && Object.keys(visit.vitals).length > 0;
+            const age = getAge(visit.patient?.dob ?? null);
+
+            if (isMobile) {
+              return (
+                <Card key={visit.id} className={`shadow-card ${isCompleted ? "opacity-70" : ""}`}>
+                  <CardContent className="p-4">
+                    {/* Top row: token + patient info + status */}
+                    <div className="flex items-start gap-3">
+                      <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${isCompleted ? "bg-muted" : "bg-primary"}`}>
+                        <span className={`text-sm font-bold ${isCompleted ? "text-muted-foreground" : "text-primary-foreground"}`}>#{visit.token_number}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className="font-semibold text-foreground text-sm truncate">{visit.patient?.name}</h3>
+                          <Badge variant="outline" className={`flex-shrink-0 text-[10px] ${statusColor(visit.status)}`}>
+                            {isCompleted && <Lock className="mr-1 h-2.5 w-2.5" />}
+                            {visit.status.replace("_", " ")}
+                          </Badge>
+                        </div>
+                        {visit.patient?.healthcare_id && (
+                          <p className="text-xs text-primary font-medium mt-0.5">{visit.patient.healthcare_id}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {visit.patient?.gender}{age !== null && `, ${age}y`}{visit.patient?.blood_group && ` · ${visit.patient.blood_group}`}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Chief complaint */}
+                    {visit.chief_complaint && (
+                      <div className="mt-2 ml-[52px]">
+                        <span className="inline-block bg-accent text-accent-foreground text-xs px-2 py-0.5 rounded-full border border-border">
+                          {visit.chief_complaint}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Vitals + action */}
+                    <div className="mt-2 ml-[52px] flex items-center justify-between">
+                      <span className={`text-xs flex items-center gap-1 ${hasVitals ? "text-success" : "text-destructive"}`}>
+                        <span className={`w-2 h-2 rounded-full ${hasVitals ? "bg-success" : "bg-destructive"}`} />
+                        {hasVitals ? "Vitals recorded" : "No vitals"}
+                      </span>
+                      {isCompleted ? (
+                        <Button variant="outline" size="sm" className="text-xs h-7 px-3" onClick={(e) => { e.stopPropagation(); handleViewNotes(visit); }}>
+                          <Eye className="mr-1 h-3 w-3" /> View Notes
+                        </Button>
+                      ) : (
+                        <Button size="sm" className="text-xs h-7 px-3" onClick={(e) => { e.stopPropagation(); handleStartConsultation(visit); }}>
+                          <ArrowRight className="mr-1 h-3 w-3" />
+                          {visit.status === "in_progress" ? "Continue" : "Start"}
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            }
+
+            // Desktop card
             return (
               <Card
                 key={visit.id}
@@ -182,7 +259,7 @@ export default function DoctorDashboard() {
                         <p className="text-sm text-foreground/80 mt-1 truncate">{visit.chief_complaint}</p>
                       )}
                       <div className="mt-2 flex items-center gap-2 flex-wrap">
-                        {visit.vitals && Object.keys(visit.vitals).length > 0 ? (
+                        {hasVitals ? (
                           <Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/30">Vitals recorded</Badge>
                         ) : (
                           <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/30">No vitals</Badge>
@@ -244,7 +321,7 @@ export default function DoctorDashboard() {
           </SheetHeader>
           {notesLoading ? (
             <div className="flex justify-center py-8">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
           ) : notesData ? (
             <div className="space-y-4 mt-4">
