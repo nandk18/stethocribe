@@ -5,11 +5,12 @@ import { NavLink } from "@/components/NavLink";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
-  Stethoscope, Users, CalendarDays, Settings, LogOut, UserPlus, Menu, X, FileText, BarChart2
+  Stethoscope, Users, CalendarDays, Settings, LogOut, UserPlus, Menu, X, FileText, BarChart2, Calendar
 } from "lucide-react";
 
 const receptionistLinks = [
   { to: "/dashboard", icon: CalendarDays, label: "Today's Queue" },
+  { to: "/dashboard/appointments", icon: Calendar, label: "Appointments" },
   { to: "/dashboard/patients", icon: UserPlus, label: "Patients" },
   { to: "/dashboard/settings", icon: Settings, label: "Settings" },
 ];
@@ -23,6 +24,7 @@ const doctorLinks = [
 
 const adminLinks = [
   { to: "/dashboard", icon: CalendarDays, label: "Queue" },
+  { to: "/dashboard/appointments", icon: Calendar, label: "Appointments" },
   { to: "/dashboard/patients", icon: Users, label: "Patients" },
   { to: "/dashboard/templates", icon: FileText, label: "Templates" },
   { to: "/dashboard/analytics", icon: BarChart2, label: "Analytics" },

@@ -194,6 +194,9 @@ export default function PatientDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Vitals Trends */}
+      {patientId && <VitalsTrends patientId={patientId} />}
+
       {/* Visit History */}
       <h2 className="font-display text-lg font-semibold text-foreground mb-3">Visit History</h2>
       {visits.length === 0 ? (
