@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Calendar, ChevronDown, FileText, Pill, ExternalLink, Loader2 } from "lucide-react";
+import VitalsTrends from "@/components/vitals/VitalsTrends";
 
 function PrescriptionLinkButton({ pdfUrl }: { pdfUrl: string }) {
   const [loading, setLoading] = useState(false);
