@@ -197,14 +197,27 @@ export default function Settings() {
     finally { setChangingPassword(false); }
   };
 
-  const handleRemoveStaff = async (userId: string, name: string) => {
-    if (!confirm(`Remove ${name || "this member"} from the clinic?`)) return;
+  const handleRemoveStaff = async (userId: string) => {
+    setIsRemoving(userId);
     try {
-      await supabase.from("profiles").update({ clinic_id: null }).eq("user_id", userId);
-      toast.success("Staff member removed");
-      fetchTeam();
-    } catch (err: any) { toast.error(err.message); }
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ clinic_id: null })
+        .eq("user_id", userId);
+      if (profileError) throw profileError;
+
+      toast.success("Team member removed successfully");
+      setTeamMembers(prev => prev.filter(m => m.user_id !== userId));
+      await fetchTeam();
+    } catch (err: any) {
+      toast.error("Failed to remove: " + err.message);
+    } finally {
+      setIsRemoving(null);
+      setConfirmDeleteId(null);
+    }
   };
+
+  const confirmDeleteMember = teamMembers.find(m => m.user_id === confirmDeleteId);
 
   const openEditPanel = (member: TeamMember) => {
     setEditMember(member);
