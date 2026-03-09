@@ -429,7 +429,7 @@ export default function Settings() {
                                   <Button
                                     variant="ghost" size="sm"
                                     className="text-destructive hover:text-destructive"
-                                    onClick={() => handleRemoveStaff(member.user_id, member.display_name)}
+                                    onClick={() => setConfirmDeleteId(member.user_id)}
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
