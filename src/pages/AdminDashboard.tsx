@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { CalendarDays, Stethoscope, UserPlus, Clock, AlertTriangle, ArrowRight, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import TodayAppointmentsWidget from "@/components/appointments/TodayAppointmentsWidget";
 
 type Visit = {
   id: string;
