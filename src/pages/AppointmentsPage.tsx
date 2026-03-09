@@ -145,7 +145,7 @@ export default function AppointmentsPage() {
   };
 
   const updateStatus = async (id: string, status: string) => {
-    await supabase.from("appointments").update({ status } as any).eq("id", id);
+    await (supabase as any).from("appointments").update({ status } as any).eq("id", id);
     setDetailAppt(null);
     fetchAppointments();
     toast.success(`Appointment marked as ${status}`);
