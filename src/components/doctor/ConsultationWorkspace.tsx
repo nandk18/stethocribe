@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Mic, FileText, Pill, CheckCircle, AlertTriangle, Activity, History, User, FolderOpen, Upload } from "lucide-react";
+import { Mic, FileText, Pill, CheckCircle, AlertTriangle, Activity, History, User, FolderOpen, Upload, Loader2 } from "lucide-react";
 import VoiceRecorder from "@/components/doctor/VoiceRecorder";
 import PatientHistory from "@/components/doctor/PatientHistory";
 import PrescriptionShareModal from "@/components/doctor/PrescriptionShareModal";
