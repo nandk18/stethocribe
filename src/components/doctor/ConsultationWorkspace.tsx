@@ -295,6 +295,7 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
         });
         if (!pdfError && pdfResult?.path) {
           setSharePdfUrl(pdfResult.path);
+          setSharePrescriptionId(prescriptionId);
           setShareOpen(true);
           toast.success("Prescription generated!");
         } else {
