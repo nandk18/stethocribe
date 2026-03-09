@@ -124,6 +124,7 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
   // Sharing modal
   const [shareOpen, setShareOpen] = useState(false);
   const [sharePdfUrl, setSharePdfUrl] = useState<string | null>(null);
+  const [sharePrescriptionId, setSharePrescriptionId] = useState<string | null>(null);
 
   const getAge = (dob: string | null) => {
     if (!dob) return "N/A";
@@ -294,6 +295,7 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
         });
         if (!pdfError && pdfResult?.path) {
           setSharePdfUrl(pdfResult.path);
+          setSharePrescriptionId(prescriptionId);
           setShareOpen(true);
           toast.success("Prescription generated!");
         } else {
@@ -453,6 +455,7 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
         open={shareOpen}
         onClose={() => { setShareOpen(false); onComplete(); }}
         prescriptionPdfUrl={sharePdfUrl}
+        prescriptionId={sharePrescriptionId}
         patient={visit.patient ? {
           name: visit.patient.name, phone: visit.patient.phone || null,
           email: visit.patient.email || null, healthcare_id: visit.patient.healthcare_id || null,

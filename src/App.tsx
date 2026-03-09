@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import Auth from "./pages/Auth";
 import AcceptInvite from "./pages/AcceptInvite";
+import PrescriptionViewer from "./pages/PrescriptionViewer";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Onboarding from "./pages/Onboarding";
@@ -54,6 +55,7 @@ function AppRoutes() {
   if (!session) {
     return (
       <Routes>
+        <Route path="/rx/:prescriptionId" element={<PrescriptionViewer />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/accept-invite" element={<AcceptInvite />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -76,6 +78,7 @@ function AppRoutes() {
   if (!clinicReady) {
     return (
       <Routes>
+        <Route path="/rx/:prescriptionId" element={<PrescriptionViewer />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="*" element={<Navigate to="/onboarding" replace />} />
       </Routes>
@@ -88,6 +91,7 @@ function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/rx/:prescriptionId" element={<PrescriptionViewer />} />
       <Route path="/dashboard" element={<DashboardComponent />} />
       <Route path="/dashboard/consultation/:visitId" element={
         role === "doctor" || role === "admin" ? <DoctorConsultationPage /> : <Navigate to="/dashboard" replace />
