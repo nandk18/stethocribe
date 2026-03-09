@@ -29,6 +29,7 @@ type Props = {
 
 export default function PrescriptionShareModal({ open, onClose, prescriptionPdfUrl, prescriptionId, patient, clinicName, doctorName, emrExportProps }: Props) {
   const viewerUrl = prescriptionId ? `${window.location.origin}/rx/${prescriptionId}` : null;
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const isMobile = useIsMobile();
 
@@ -44,28 +45,28 @@ export default function PrescriptionShareModal({ open, onClose, prescriptionPdfU
   }, [open, prescriptionPdfUrl]);
 
   const handleWhatsApp = () => {
-    if (!patient?.phone || !signedUrl) return;
+    if (!patient?.phone || !viewerUrl) return;
     const phone = patient.phone.replace(/\D/g, "");
     const message = encodeURIComponent(
-      `Dear ${patient.name}, your prescription from ${clinicName} is ready.\n\nView & Download: ${signedUrl}\n\nValid for 7 days.`
+      `Dear ${patient.name}, your prescription from ${clinicName} is ready.\n\nView & Download: ${viewerUrl}\n\nThe prescription will open in your browser.`
     );
     window.open(`https://wa.me/${phone}?text=${message}`, "_blank");
   };
 
   const handleEmail = () => {
-    if (!patient?.email || !signedUrl) return;
-    const subject = encodeURIComponent(`Prescription - ${clinicName}`);
+    if (!patient?.email || !viewerUrl) return;
+    const subject = encodeURIComponent(`Your Prescription - ${clinicName}`);
     const body = encodeURIComponent(
-      `Dear ${patient.name},\n\nYour prescription is ready.\nView and download here: ${signedUrl}\n\nThis link is valid for 7 days.\n\nRegards,\n${doctorName}\n${clinicName}`
+      `Dear ${patient.name},\n\nYour prescription is ready.\nClick here to view: ${viewerUrl}\n\nRegards,\n${doctorName}\n${clinicName}`
     );
     window.open(`mailto:${patient.email}?subject=${subject}&body=${body}`);
   };
 
   const handleCopy = async () => {
-    if (!signedUrl) return;
+    if (!viewerUrl) return;
     try {
-      await navigator.clipboard.writeText(`Prescription for ${patient?.name}: ${signedUrl}`);
-      toast.success("Link copied — paste in any SMS or messaging app");
+      await navigator.clipboard.writeText(viewerUrl);
+      toast.success("Link copied!");
     } catch {
       toast.error("Failed to copy");
     }
@@ -113,6 +114,8 @@ export default function PrescriptionShareModal({ open, onClose, prescriptionPdfU
     }
   };
 
+  const shareReady = !!viewerUrl;
+
   const content = (
     <div className="space-y-5 py-2">
       <div className="flex items-center gap-3">
@@ -127,7 +130,7 @@ export default function PrescriptionShareModal({ open, onClose, prescriptionPdfU
 
       {loading ? (
         <div className="flex justify-center py-6"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
-      ) : !signedUrl ? (
+      ) : !shareReady ? (
         <p className="text-sm text-muted-foreground text-center py-4">Prescription URL not available yet. Try again in a moment.</p>
       ) : (
         <>
@@ -141,14 +144,14 @@ export default function PrescriptionShareModal({ open, onClose, prescriptionPdfU
             <Button variant="outline" className="h-12 gap-2 rounded-xl" onClick={handleCopy}>
               <Copy className="h-4 w-4" /> Copy Link
             </Button>
-            <Button variant="outline" className="h-12 gap-2 rounded-xl" onClick={handleDownload}>
+            <Button variant="outline" className="h-12 gap-2 rounded-xl" onClick={handleDownload} disabled={!signedUrl}>
               <Download className="h-4 w-4" /> Download
             </Button>
           </div>
-          <Button variant="outline" className="w-full h-12 gap-2 rounded-xl" onClick={handlePrint}>
+          <Button variant="outline" className="w-full h-12 gap-2 rounded-xl" onClick={handlePrint} disabled={!signedUrl}>
             <Printer className="h-4 w-4" /> Print
           </Button>
-          <p className="text-xs text-muted-foreground text-center">Link valid for 7 days</p>
+          <p className="text-xs text-muted-foreground text-center">Share link works without login</p>
         </>
       )}
 
