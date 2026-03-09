@@ -29,7 +29,7 @@ export default function TodayAppointmentsWidget() {
   const fetchToday = async () => {
     if (!profile?.clinic_id) return;
     const today = format(new Date(), "yyyy-MM-dd");
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from("appointments")
       .select("id, clinic_id, patient_id, doctor_id, appointment_time, status, reason, patients(name, healthcare_id), doctors(name)")
       .eq("clinic_id", profile.clinic_id)
