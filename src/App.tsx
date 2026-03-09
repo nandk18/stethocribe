@@ -100,6 +100,7 @@ function AppRoutes() {
       <Route path="/dashboard/patients" element={<PatientsPage />} />
       <Route path="/dashboard/patients/:patientId" element={<PatientDetailPage />} />
       <Route path="/dashboard/templates" element={<TemplatesPage />} />
+      <Route path="/dashboard/analytics" element={role === "admin" ? <AnalyticsPage /> : <Navigate to="/dashboard" replace />} />
       <Route path="/dashboard/settings" element={<Settings />} />
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
