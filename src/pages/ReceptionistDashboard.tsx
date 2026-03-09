@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PatientRegistration from "@/components/receptionist/PatientRegistration";
 import TodayQueue from "@/components/receptionist/TodayQueue";
+import TodayAppointmentsWidget from "@/components/appointments/TodayAppointmentsWidget";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CalendarDays, UserPlus } from "lucide-react";
 
