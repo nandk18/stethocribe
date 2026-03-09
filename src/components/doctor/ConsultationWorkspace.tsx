@@ -124,6 +124,7 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
   // Sharing modal
   const [shareOpen, setShareOpen] = useState(false);
   const [sharePdfUrl, setSharePdfUrl] = useState<string | null>(null);
+  const [sharePrescriptionId, setSharePrescriptionId] = useState<string | null>(null);
 
   const getAge = (dob: string | null) => {
     if (!dob) return "N/A";
