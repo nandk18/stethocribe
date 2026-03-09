@@ -19,6 +19,7 @@ import PatientDetailPage from "./pages/PatientDetailPage";
 import Settings from "./pages/Settings";
 import TemplatesPage from "./pages/TemplatesPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
+import AppointmentsPage from "./pages/AppointmentsPage";
 import NotFound from "./pages/NotFound";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
