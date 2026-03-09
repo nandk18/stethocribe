@@ -118,7 +118,7 @@ export default function AppointmentsPage() {
     if (!selectedPatient || !bookDoctorId || !bookDate || !bookTime || !profile?.clinic_id) return;
     setBooking(true);
     try {
-      const { error } = await supabase.from("appointments").insert({
+      const { error } = await (supabase as any).from("appointments").insert({
         clinic_id: profile.clinic_id,
         patient_id: selectedPatient.id,
         doctor_id: bookDoctorId,
