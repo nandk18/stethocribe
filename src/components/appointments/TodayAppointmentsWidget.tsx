@@ -68,7 +68,7 @@ export default function TodayAppointmentsWidget() {
       });
       if (error) throw error;
 
-      await supabase.from("appointments").update({ status: "completed" } as any).eq("id", appt.id);
+      await (supabase as any).from("appointments").update({ status: "completed" } as any).eq("id", appt.id);
       toast.success(`${appt.patient?.name} added to queue as #${nextToken}`);
       fetchToday();
     } catch (err: any) { toast.error(err.message); }

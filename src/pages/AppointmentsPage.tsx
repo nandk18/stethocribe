@@ -172,7 +172,7 @@ export default function AppointmentsPage() {
       });
       if (error) throw error;
 
-      await supabase.from("appointments").update({ status: "completed" } as any).eq("id", appt.id);
+      await (supabase as any).from("appointments").update({ status: "completed" } as any).eq("id", appt.id);
       setDetailAppt(null);
       fetchAppointments();
       toast.success(`${appt.patient?.name} added to today's queue as #${nextToken}`);
