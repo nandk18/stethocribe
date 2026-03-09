@@ -56,6 +56,8 @@ export default function Settings() {
 
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loadingTeam, setLoadingTeam] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [isRemoving, setIsRemoving] = useState<string | null>(null);
 
   // Edit panel
   const [editOpen, setEditOpen] = useState(false);
