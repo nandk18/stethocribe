@@ -81,6 +81,7 @@ function AdminQueueView() {
 
   return (
     <Tabs defaultValue="reception" className="space-y-4">
+      <TodayAppointmentsWidget />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <TabsList className="w-full sm:w-auto overflow-x-auto">
           <TabsTrigger value="reception"><CalendarDays className="mr-2 h-4 w-4" /> Reception View</TabsTrigger>

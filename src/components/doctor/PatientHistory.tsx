@@ -102,6 +102,7 @@ export default function PatientHistory({ patientId, currentVisitId }: Props) {
 
   return (
     <div className="space-y-3">
+      <VitalsTrends patientId={patientId} />
       <p className="text-sm text-muted-foreground">{history.length} previous visit{history.length !== 1 ? "s" : ""}</p>
       {history.map(visit => {
         const soap = visit.clinical_notes?.[0]?.soap_notes;
