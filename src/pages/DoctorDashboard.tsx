@@ -143,13 +143,13 @@ export default function DoctorDashboard() {
         </div>
       </div>
 
-      {/* Filter tabs — evenly distributed on mobile, auto on desktop */}
-      <div className="mb-6 grid grid-cols-4 gap-2 sm:flex sm:gap-2 px-1">
+      {/* Filter tabs */}
+      <div className="mb-6 flex gap-2 overflow-x-auto no-scrollbar px-1">
         {filterTabs.map(tab => (
           <button
             key={tab.key}
             onClick={() => setFilter(tab.key)}
-            className={`whitespace-nowrap text-xs px-2 sm:px-3 py-1.5 rounded-full font-medium transition-all text-center ${
+            className={`flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5 rounded-full font-medium transition-all ${
               filter === tab.key
                 ? "bg-primary text-primary-foreground"
                 : "bg-background text-muted-foreground border border-border"
