@@ -95,6 +95,7 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
   // Template
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [activeSections, setActiveSections] = useState<string[]>(DEFAULT_SECTIONS);
+  const [isReformatting, setIsReformatting] = useState(false);
 
   // Doctor's enabled templates
   const [enabledTemplateNames, setEnabledTemplateNames] = useState<string[]>(["SOAP Notes"]);
