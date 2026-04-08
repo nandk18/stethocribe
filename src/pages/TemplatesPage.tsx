@@ -19,7 +19,6 @@ const SYSTEM_TEMPLATES = [
   { name: "Referral Letter", description: "Patient referral to specialist" },
   { name: "Prescription Only", description: "Quick prescription without detailed notes" },
   { name: "Oncology Consultation", description: "Cancer care consultation template" },
-  { name: "EKA EMR Format", description: "Compatible with EKA.care EMR system" },
 ];
 
 export default function TemplatesPage() {

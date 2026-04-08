@@ -11,32 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ArrowLeft, Calendar, ChevronDown, FileText, Pill, ExternalLink, Loader2, Phone, Mail, AlertTriangle, Activity, User, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import VitalsTrends from "@/components/vitals/VitalsTrends";
-
-function PrescriptionLinkButton({ pdfUrl }: { pdfUrl: string }) {
-  const [loading, setLoading] = useState(false);
-  const handleClick = async () => {
-    setLoading(true);
-    try {
-      const { data } = await supabase.storage.from("prescriptions").createSignedUrl(pdfUrl, 600);
-      if (data?.signedUrl) {
-        if (pdfUrl.endsWith(".html")) {
-          const res = await fetch(data.signedUrl);
-          const html = await res.text();
-          const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-          const blobUrl = URL.createObjectURL(blob);
-          window.open(blobUrl, "_blank");
-        } else {
-          window.open(data.signedUrl, "_blank");
-        }
-      }
-    } catch {} finally { setLoading(false); }
-  };
-  return (
-    <Button variant="ghost" size="sm" className="text-xs h-7" onClick={handleClick} disabled={loading}>
-      {loading ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <ExternalLink className="mr-1 h-3 w-3" />} View Prescription
-    </Button>
-  );
-}
+import { renderClinicalNotes } from "@/lib/templateFields";
 
 type Patient = {
   id: string; name: string; healthcare_id: string | null; gender: string | null;
@@ -49,7 +24,7 @@ type HistoryVisit = {
   chief_complaint: string | null; status: string | null;
   doctors: { name: string; qualification: string | null } | null;
   clinical_notes: { soap_notes: any; raw_transcript: string | null }[];
-  prescriptions: { medications: any; investigations: any; follow_up_date: string | null; pdf_url: string | null; notes: string | null }[];
+  prescriptions: { id: string; medications: any; investigations: any; follow_up_date: string | null; pdf_url: string | null; notes: string | null }[];
 };
 
 export default function PatientDetailPage() {
@@ -79,7 +54,7 @@ export default function PatientDetailPage() {
           id, visit_date, token_number, chief_complaint, status,
           doctors(name, qualification),
           clinical_notes(soap_notes, raw_transcript),
-          prescriptions(medications, investigations, follow_up_date, pdf_url, notes)
+          prescriptions(id, medications, investigations, follow_up_date, pdf_url, notes)
         `).eq("patient_id", patientId).order("visit_date", { ascending: false }).limit(50),
       ]);
       if (patientRes.data) setPatient(patientRes.data as any);
@@ -213,7 +188,9 @@ export default function PatientDetailPage() {
           {visits.map(visit => {
             const soap = visit.clinical_notes?.[0]?.soap_notes;
             const meds = visit.prescriptions?.[0]?.medications;
-            const pdfUrl = visit.prescriptions?.[0]?.pdf_url;
+            const prescriptionId = visit.prescriptions?.[0]?.id;
+
+            const displayField = soap?.assessment || soap?.diagnosis || soap?.admission_diagnosis || soap?.current_status;
 
             return (
               <Card key={visit.id} className="shadow-card">
@@ -238,8 +215,8 @@ export default function PatientDetailPage() {
                     <p className="text-sm text-muted-foreground">{visit.chief_complaint}</p>
                   )}
 
-                  {soap?.assessment && (
-                    <p className="text-sm font-semibold text-foreground">{soap.assessment}</p>
+                  {displayField && (
+                    <p className="text-sm font-semibold text-foreground">{displayField}</p>
                   )}
 
                   {meds && Array.isArray(meds) && meds.length > 0 && (
@@ -261,14 +238,20 @@ export default function PatientDetailPage() {
                           </Button>
                         </CollapsibleTrigger>
                         <CollapsibleContent className="mt-2 space-y-2 rounded-lg bg-muted/50 p-3 text-xs">
-                          {soap.subjective && <div><span className="font-semibold text-foreground">Subjective:</span> <span className="text-muted-foreground">{soap.subjective}</span></div>}
-                          {soap.objective && <div><span className="font-semibold text-foreground">Objective:</span> <span className="text-muted-foreground">{soap.objective}</span></div>}
-                          {soap.assessment && <div><span className="font-semibold text-foreground">Assessment:</span> <span className="text-muted-foreground">{soap.assessment}</span></div>}
-                          {soap.plan && <div><span className="font-semibold text-foreground">Plan:</span> <span className="text-muted-foreground">{soap.plan}</span></div>}
+                          {renderClinicalNotes(soap)}
                         </CollapsibleContent>
                       </Collapsible>
                     )}
-                    {pdfUrl && <PrescriptionLinkButton pdfUrl={pdfUrl} />}
+                    {prescriptionId && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs h-7"
+                        onClick={() => window.open(`/rx/${prescriptionId}`, "_blank")}
+                      >
+                        <ExternalLink className="mr-1 h-3 w-3" /> View Prescription
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
