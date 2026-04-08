@@ -21,9 +21,10 @@ type Props = {
 export default function TemplateSelector({ clinicId, doctorId, doctorDefaultTemplateId, enabledTemplateNames, onTemplateChange }: Props) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchTemplates = async () => {
       const { data } = await supabase
         .from("note_templates")
         .select("id, name, description, sections")
@@ -34,29 +35,35 @@ export default function TemplateSelector({ clinicId, doctorId, doctorDefaultTemp
           ...t,
           sections: Array.isArray(t.sections) ? t.sections : [],
         }));
-        // Filter to only doctor's enabled templates
         const enabled = enabledTemplateNames.length > 0
           ? allTemplates.filter(t => enabledTemplateNames.includes(t.name))
           : allTemplates.filter(t => t.name === "SOAP Notes");
         
         setTemplates(enabled);
 
-        // Auto-select: doctor's default first, then first enabled
-        const defaultTemplate = doctorDefaultTemplateId
-          ? enabled.find(t => t.id === doctorDefaultTemplateId)
-          : null;
-        const initial = defaultTemplate || enabled[0] || null;
-        if (initial) {
-          setSelectedId(initial.id);
-          onTemplateChange(initial);
+        // Only auto-select on first mount, not on re-renders from tab switches
+        if (!initialized) {
+          // Check localStorage first
+          const savedId = localStorage.getItem(`template_${doctorId}`);
+          const savedTemplate = savedId ? enabled.find(t => t.id === savedId) : null;
+
+          const defaultTemplate = savedTemplate
+            || (doctorDefaultTemplateId ? enabled.find(t => t.id === doctorDefaultTemplateId) : null);
+          const initial = defaultTemplate || enabled[0] || null;
+          if (initial) {
+            setSelectedId(initial.id);
+            onTemplateChange(initial);
+          }
+          setInitialized(true);
         }
       }
     };
-    fetch();
+    fetchTemplates();
   }, [clinicId, enabledTemplateNames.join(",")]);
 
   const handleChange = (id: string) => {
     setSelectedId(id);
+    localStorage.setItem(`template_${doctorId}`, id);
     const tmpl = templates.find(t => t.id === id) || null;
     onTemplateChange(tmpl);
   };
