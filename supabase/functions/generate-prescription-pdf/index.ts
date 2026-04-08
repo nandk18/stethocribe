@@ -24,6 +24,66 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
   Sindhi: { clinic: "دواخانو", doctor: "ڊاڪٽر", patient: "مريض", date: "تاريخ", rx: "نسخو", followUp: "اڳيون ملاقات", morning: "صبح", afternoon: "منجهند", evening: "شام", night: "رات", investigations: "جاچ", soap: "طبي نوٽ" },
 }
 
+const TEMPLATE_FIELD_LABELS: Record<string, Array<{key: string, label: string}>> = {
+  "SOAP Notes": [
+    { key: "subjective", label: "Subjective" },
+    { key: "objective", label: "Objective" },
+    { key: "assessment", label: "Assessment" },
+    { key: "plan", label: "Plan" },
+  ],
+  "SOAP Detailed": [
+    { key: "hpi", label: "History of Present Illness" },
+    { key: "ros", label: "Review of Systems" },
+    { key: "physical_exam", label: "Physical Examination" },
+    { key: "assessment", label: "Assessment" },
+    { key: "plan", label: "Plan" },
+  ],
+  "Clinical Notes": [
+    { key: "history", label: "History" },
+    { key: "examination", label: "Examination" },
+    { key: "diagnosis", label: "Diagnosis" },
+    { key: "treatment", label: "Treatment Plan" },
+  ],
+  "General Health Check-Up": [
+    { key: "vitals_review", label: "Vitals Review" },
+    { key: "systems_review", label: "Systems Review" },
+    { key: "assessment", label: "Assessment" },
+    { key: "recommendations", label: "Recommendations" },
+  ],
+  "General Inpatient Admission": [
+    { key: "presenting_complaint", label: "Presenting Complaint" },
+    { key: "history", label: "History" },
+    { key: "examination", label: "Examination" },
+    { key: "investigations", label: "Investigations" },
+    { key: "admission_diagnosis", label: "Admission Diagnosis" },
+    { key: "management_plan", label: "Management Plan" },
+  ],
+  "Follow-Up Visit": [
+    { key: "interval_history", label: "Interval History" },
+    { key: "current_status", label: "Current Status" },
+    { key: "medication_review", label: "Medication Review" },
+    { key: "plan_adjustment", label: "Plan Adjustment" },
+  ],
+  "Referral Letter": [
+    { key: "reason_for_referral", label: "Reason for Referral" },
+    { key: "clinical_summary", label: "Clinical Summary" },
+    { key: "current_medications", label: "Current Medications" },
+    { key: "request", label: "Request" },
+  ],
+  "Prescription Only": [
+    { key: "diagnosis", label: "Diagnosis" },
+    { key: "instructions", label: "Instructions" },
+  ],
+  "Oncology Consultation": [
+    { key: "cancer_history", label: "Cancer History" },
+    { key: "current_status", label: "Current Status" },
+    { key: "treatment_history", label: "Treatment History" },
+    { key: "examination", label: "Examination" },
+    { key: "assessment", label: "Assessment" },
+    { key: "plan", label: "Plan" },
+  ],
+}
+
 const transliterateWithClaude = async (text: string, language: string, apiKey: string): Promise<string> => {
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -47,6 +107,30 @@ const transliterateWithClaude = async (text: string, language: string, apiKey: s
   } catch {
     return ""
   }
+}
+
+function buildClinicalNotesHtml(soap: Record<string, any>, escHtml: (s: string) => string): string {
+  const templateName = soap._template || "SOAP Notes"
+  const templateFields = TEMPLATE_FIELD_LABELS[templateName]
+
+  let clinicalNotesHtml = ""
+
+  if (templateFields) {
+    clinicalNotesHtml = templateFields
+      .filter(f => soap[f.key] && String(soap[f.key]).trim())
+      .map(f => `<div class="soap-label">${escHtml(f.label)}</div><div class="soap-value">${escHtml(String(soap[f.key]))}</div>`)
+      .join("")
+  } else {
+    clinicalNotesHtml = Object.entries(soap)
+      .filter(([key, val]) => !key.startsWith("_") && val && String(val).trim())
+      .map(([key, val]) => {
+        const label = key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())
+        return `<div class="soap-label">${escHtml(label)}</div><div class="soap-value">${escHtml(String(val))}</div>`
+      })
+      .join("")
+  }
+
+  return clinicalNotesHtml
 }
 
 serve(async (req) => {
@@ -95,7 +179,6 @@ serve(async (req) => {
       ? String(Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000)))
       : "N/A"
 
-    // Transliterate clinic and doctor names into regional script
     let clinicNameRegional = ""
     let doctorNameRegional = ""
     if (t && anthropicKey && lang) {
@@ -108,7 +191,6 @@ serve(async (req) => {
       console.log("Transliterated clinic:", clinicNameRegional, "doctor:", doctorNameRegional)
     }
 
-    // Fetch clinic logo
     let logoDataUrl = ""
     if (clinic?.logo_url) {
       try {
@@ -123,7 +205,6 @@ serve(async (req) => {
       } catch { /* logo fetch failed, skip */ }
     }
 
-    // Fetch doctor signature
     let signatureDataUrl = ""
     if (doctor?.signature_url) {
       try {
@@ -143,6 +224,9 @@ serve(async (req) => {
       : `<span style="color:#ccc;">—</span>`
 
     const escHtml = (s: string) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+
+    const templateName = soap._template || "SOAP Notes"
+    const clinicalNotesHtml = buildClinicalNotesHtml(soap, escHtml)
 
     const html = `<!DOCTYPE html>
 <html>
@@ -173,7 +257,7 @@ serve(async (req) => {
   .vitals-row { display: flex; flex-wrap: wrap; gap: 6px; }
   .vital-chip { background: #f0fafa; border: 1px solid #b2d8d8; border-radius: 4px; padding: 3px 9px; font-size: 10px; color: #1a1a1a; }
   .vital-chip strong { color: #0D6E6E; }
-  .soap-grid { display: grid; grid-template-columns: 110px 1fr; row-gap: 6px; }
+  .soap-grid { display: grid; grid-template-columns: 140px 1fr; row-gap: 6px; }
   .soap-label { font-size: 9px; font-weight: 700; color: #666; text-transform: uppercase; padding-top: 1px; }
   .soap-value { font-size: 11px; color: #1a1a1a; line-height: 1.5; }
   .rx-header { font-size: 14px; font-weight: 800; color: #0D6E6E; margin-bottom: 6px; }
@@ -262,16 +346,14 @@ ${visit.chief_complaint ? `
   <p>${escHtml(visit.chief_complaint)}</p>
 </div>` : ""}
 
-${soap.assessment || soap.subjective ? `
+${clinicalNotesHtml ? `
 <div class="section">
   <div class="section-title">
-    ${t ? `<span class="regional-title regional">${t.soap}</span> / ` : ""}Clinical Notes (SOAP)
+    ${t ? `<span class="regional-title regional">${t.soap}</span> / ` : ""}Clinical Notes
+    <span style="font-size:9px;font-weight:normal;color:#6B7280;margin-left:8px;">(${escHtml(templateName)})</span>
   </div>
   <div class="soap-grid">
-    ${soap.subjective ? `<div class="soap-label">S – Subjective</div><div class="soap-value">${escHtml(soap.subjective)}</div>` : ""}
-    ${soap.objective ? `<div class="soap-label">O – Objective</div><div class="soap-value">${escHtml(soap.objective)}</div>` : ""}
-    ${soap.assessment ? `<div class="soap-label">A – Assessment</div><div class="soap-value">${escHtml(soap.assessment)}</div>` : ""}
-    ${soap.plan ? `<div class="soap-label">P – Plan</div><div class="soap-value">${escHtml(soap.plan)}</div>` : ""}
+    ${clinicalNotesHtml}
   </div>
 </div>` : ""}
 

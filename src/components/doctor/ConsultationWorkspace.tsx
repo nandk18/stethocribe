@@ -231,6 +231,10 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
     activeSections.forEach(s => {
       if (noteFields[s]?.trim()) soap[s] = noteFields[s];
     });
+    // Store which template was used so history/PDF can render correct field labels
+    if (selectedTemplate?.name) {
+      soap._template = selectedTemplate.name;
+    }
     return soap;
   };
 
