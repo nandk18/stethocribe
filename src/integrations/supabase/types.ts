@@ -14,6 +14,73 @@ export type Database = {
   }
   public: {
     Tables: {
+      appointments: {
+        Row: {
+          appointment_date: string
+          appointment_time: string
+          clinic_id: string | null
+          created_at: string | null
+          created_by: string | null
+          doctor_id: string | null
+          duration_minutes: number | null
+          id: string
+          notes: string | null
+          patient_id: string | null
+          reason: string | null
+          status: string | null
+        }
+        Insert: {
+          appointment_date: string
+          appointment_time: string
+          clinic_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          doctor_id?: string | null
+          duration_minutes?: number | null
+          id?: string
+          notes?: string | null
+          patient_id?: string | null
+          reason?: string | null
+          status?: string | null
+        }
+        Update: {
+          appointment_date?: string
+          appointment_time?: string
+          clinic_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          doctor_id?: string | null
+          duration_minutes?: number | null
+          id?: string
+          notes?: string | null
+          patient_id?: string | null
+          reason?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "doctors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clinical_notes: {
         Row: {
           audio_url: string | null
