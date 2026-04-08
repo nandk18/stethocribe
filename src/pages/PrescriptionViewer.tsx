@@ -8,6 +8,7 @@ export default function PrescriptionViewer() {
   const [htmlContent, setHtmlContent] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -27,6 +28,8 @@ export default function PrescriptionViewer() {
           setError("Prescription not found or link has expired.");
           return;
         }
+
+        setPdfUrl(prescription.pdf_url);
 
         const { data: signedData, error: signErr } = await supabase.storage
           .from("prescriptions")
@@ -48,6 +51,28 @@ export default function PrescriptionViewer() {
     };
     load();
   }, [prescriptionId]);
+
+  const handlePrint = async () => {
+    if (!pdfUrl) return;
+    try {
+      const { data: signedData } = await supabase.storage
+        .from("prescriptions")
+        .createSignedUrl(pdfUrl, 3600);
+
+      if (!signedData?.signedUrl) return;
+
+      // Open the raw HTML in a new window and print it
+      const printWindow = window.open(signedData.signedUrl, "_blank");
+      if (printWindow) {
+        printWindow.addEventListener("load", () => {
+          printWindow.print();
+        });
+      }
+    } catch {
+      // Fallback to printing current page
+      window.print();
+    }
+  };
 
   if (loading) {
     return (
@@ -82,7 +107,7 @@ export default function PrescriptionViewer() {
           <span>StethoScribe Prescription</span>
         </div>
         <button
-          onClick={() => window.print()}
+          onClick={handlePrint}
           className="bg-white text-teal-700 text-xs font-semibold px-4 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-teal-50 transition-colors"
         >
           <Printer className="h-3.5 w-3.5" />

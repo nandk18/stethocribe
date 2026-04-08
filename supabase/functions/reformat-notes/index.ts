@@ -29,6 +29,17 @@ serve(async (req) => {
       .map((f: { key: string; label: string; placeholder: string }) => `"${f.key}": "${f.label} — ${f.placeholder}"`)
       .join(",\n");
 
+    const systemPrompt = `You are a medical documentation assistant helping reformat clinical notes between templates.
+
+CRITICAL RULES:
+1. PRESERVE every specific detail — doctor names, patient names, specific findings, exact measurements, specific diagnoses, drug names and doses, dates, locations, referral details
+2. Do NOT summarize or shorten — if the original says "referred to Dr. Arun (Orthopedics) at City Hospital" keep that EXACT detail
+3. Do NOT use placeholder text like "details to be provided" or "as noted above" or "see above"
+4. Map content intelligently — move information to the most appropriate field in the new template
+5. If a field in the new template has no relevant content, leave it as an empty string ""
+6. Return ONLY valid JSON with exactly the fields requested — no markdown, no explanation, no code fences
+7. Preserve all medical terminology, abbreviations, and clinical language exactly as written`;
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -39,10 +50,10 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 2000,
-        system: `You are a medical documentation assistant. You will receive existing clinical notes and must reformat them to fit a new documentation template called "${new_template_name}". Preserve all clinical information — do not add or remove medical facts. Return ONLY valid JSON with exactly the fields requested, no markdown, no explanation.`,
+        system: systemPrompt,
         messages: [{
           role: "user",
-          content: `Existing clinical notes:\n${existing_content}\n\nReformat into this "${new_template_name}" template. Return JSON with exactly these fields:\n{\n${fieldList}\n}`,
+          content: `Existing clinical notes:\n${existing_content}\n\nReformat ALL of the above content into the "${new_template_name}" template. Preserve every specific detail, name, measurement, and finding. Do NOT summarize.\n\nReturn JSON with exactly these fields:\n{\n${fieldList}\n}`,
         }],
       }),
     });
