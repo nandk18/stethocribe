@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import Auth from "./pages/Auth";
+import Index from "./pages/Index";
 import AcceptInvite from "./pages/AcceptInvite";
 import PrescriptionViewer from "./pages/PrescriptionViewer";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -57,6 +58,7 @@ function AppRoutes() {
   if (!session) {
     return (
       <Routes>
+        <Route path="/" element={<Index />} />
         <Route path="/rx/:prescriptionId" element={<PrescriptionViewer />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/accept-invite" element={<AcceptInvite />} />
