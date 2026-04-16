@@ -118,6 +118,7 @@ export default function LandingPage() {
                 {l.label}
               </button>
             ))}
+            <Link to="/auth" className="block"><Button variant="outline" className="w-full" size="sm">Login</Button></Link>
             <Link to="/auth" className="block"><Button className="w-full" size="sm">Start Free Trial</Button></Link>
           </div>
         )}
@@ -187,12 +188,28 @@ export default function LandingPage() {
       <section id="how-it-works" className="py-20 bg-muted/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground">From patient walk-in to WhatsApp prescription in minutes</h2>
-          <div className="mt-12 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          {/* Desktop: horizontal flow */}
+          <div className="mt-12 hidden md:flex items-center justify-between gap-4">
             {STEPS.map((s, i) => (
-              <div key={s.num} className="flex md:flex-col items-center md:items-center gap-4 md:gap-2 flex-1 relative">
+              <div key={s.num} className="flex flex-col items-center gap-2 flex-1 relative">
                 <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg flex-shrink-0">{s.num}</div>
-                {i < STEPS.length - 1 && <div className="hidden md:block absolute top-6 left-[calc(50%+24px)] w-[calc(100%-48px)] h-0.5 bg-primary/20" />}
-                <div className="md:text-center">
+                {i < STEPS.length - 1 && <div className="absolute top-6 left-[calc(50%+24px)] w-[calc(100%-48px)] h-0.5 bg-primary/20" />}
+                <div className="text-center">
+                  <p className="font-semibold text-foreground text-sm">{s.title}</p>
+                  <p className="text-xs text-muted-foreground">{s.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Mobile: vertical timeline */}
+          <div className="mt-12 md:hidden flex flex-col items-start gap-0 max-w-xs mx-auto">
+            {STEPS.map((s, i) => (
+              <div key={s.num} className="flex items-start gap-4 relative">
+                <div className="flex flex-col items-center">
+                  <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm flex-shrink-0 z-10">{s.num}</div>
+                  {i < STEPS.length - 1 && <div className="w-0.5 h-8 bg-primary/20" />}
+                </div>
+                <div className="pt-2 pb-4">
                   <p className="font-semibold text-foreground text-sm">{s.title}</p>
                   <p className="text-xs text-muted-foreground">{s.desc}</p>
                 </div>
@@ -324,26 +341,26 @@ export default function LandingPage() {
       {/* COMPARISON */}
       <section className="py-20 bg-muted/30">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold text-foreground">See how StethoScribe compares</h2>
-          <div className="mt-10 overflow-x-auto">
-            <table className="w-full text-sm">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">See how StethoScribe compares</h2>
+          <div className="mt-10 overflow-x-auto -mx-4 px-4">
+            <table className="w-full text-xs sm:text-sm min-w-0">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-3 px-3 text-muted-foreground font-medium">Feature</th>
-                  <th className="py-3 px-3 font-bold text-primary bg-primary/5 rounded-t-lg">StethoScribe</th>
-                  <th className="py-3 px-3 text-muted-foreground font-medium">Practo</th>
-                  <th className="py-3 px-3 text-muted-foreground font-medium">eVital</th>
-                  <th className="py-3 px-3 text-muted-foreground font-medium">Paper</th>
+                  <th className="text-left py-2 px-2 sm:py-3 sm:px-3 text-muted-foreground font-medium">Feature</th>
+                  <th className="py-2 px-1.5 sm:py-3 sm:px-3 font-bold text-primary bg-primary/5 rounded-t-lg whitespace-nowrap">Stetho</th>
+                  <th className="py-2 px-1.5 sm:py-3 sm:px-3 text-muted-foreground font-medium">Practo</th>
+                  <th className="py-2 px-1.5 sm:py-3 sm:px-3 text-muted-foreground font-medium">eVital</th>
+                  <th className="py-2 px-1.5 sm:py-3 sm:px-3 text-muted-foreground font-medium">Paper</th>
                 </tr>
               </thead>
               <tbody>
                 {COMPARISON.map((row, i) => (
                   <tr key={row.feature} className={i % 2 === 0 ? "bg-white" : ""}>
-                    <td className="text-left py-3 px-3 font-medium text-foreground">{row.feature}</td>
-                    <td className="py-3 px-3 bg-primary/5"><ComparisonCell value={row.ss} /></td>
-                    <td className="py-3 px-3"><ComparisonCell value={row.practo} /></td>
-                    <td className="py-3 px-3"><ComparisonCell value={row.evital} /></td>
-                    <td className="py-3 px-3"><ComparisonCell value={row.paper} /></td>
+                    <td className="text-left py-2 px-2 sm:py-3 sm:px-3 font-medium text-foreground whitespace-nowrap">{row.feature}</td>
+                    <td className="py-2 px-1.5 sm:py-3 sm:px-3 bg-primary/5"><ComparisonCell value={row.ss} /></td>
+                    <td className="py-2 px-1.5 sm:py-3 sm:px-3"><ComparisonCell value={row.practo} /></td>
+                    <td className="py-2 px-1.5 sm:py-3 sm:px-3"><ComparisonCell value={row.evital} /></td>
+                    <td className="py-2 px-1.5 sm:py-3 sm:px-3"><ComparisonCell value={row.paper} /></td>
                   </tr>
                 ))}
               </tbody>
