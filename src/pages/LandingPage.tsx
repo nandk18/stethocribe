@@ -1,0 +1,400 @@
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { Menu, X, Mic, FileText, MessageSquare, ClipboardList, Calendar, BarChart3, Stethoscope, Clock, PenLine, Frown, Check, Star, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+
+const NAV_LINKS = [
+  { label: "Features", href: "#features" },
+  { label: "Pricing", href: "#pricing" },
+  { label: "Contact", href: "#contact" },
+];
+
+const PROBLEMS = [
+  { icon: Clock, stat: "3-4 hours", desc: "daily on paperwork" },
+  { icon: PenLine, stat: "Manual prescriptions", desc: "error-prone & slow" },
+  { icon: Frown, stat: "Paper records", desc: "lost or illegible" },
+];
+
+const STEPS = [
+  { num: 1, title: "Patient checks in", desc: "Token assigned automatically" },
+  { num: 2, title: "Doctor opens consult", desc: "Full history ready" },
+  { num: 3, title: "Doctor speaks", desc: "AI writes notes in real time" },
+  { num: 4, title: "Review & prescribe", desc: "Medications with timing" },
+  { num: 5, title: "Tap Complete", desc: "Prescription on patient's WhatsApp" },
+];
+
+const FEATURES = [
+  { icon: Mic, title: "AI Voice Medical Scribe", desc: "Speak in any Indian language. AI transcribes and formats into clinical notes in 30 seconds." },
+  { icon: FileText, title: "Bilingual Prescriptions", desc: "Clinic name and prescriptions in English + Tamil/Hindi/Telugu — all 15 Indian languages supported." },
+  { icon: MessageSquare, title: "WhatsApp-First Delivery", desc: "Prescription link sent to patient's WhatsApp instantly. No app download. Works on any phone." },
+  { icon: ClipboardList, title: "Complete Patient Records", desc: "Full visit history, vitals trends, lab reports and documents — all in one place." },
+  { icon: Calendar, title: "Appointment Scheduling", desc: "Book, manage and convert appointments to queue automatically." },
+  { icon: BarChart3, title: "Clinic Analytics", desc: "Top diagnoses, medication trends, doctor performance and patient demographics — all visual." },
+];
+
+const ROLES = [
+  { icon: "👨‍⚕️", title: "Doctor", items: ["Voice to notes", "AI prescriptions", "Patient history", "10 templates"] },
+  { icon: "🏥", title: "Receptionist", items: ["Patient registration", "Token queue", "Vitals entry", "Appointments"] },
+  { icon: "👔", title: "Admin", items: ["Staff management", "Analytics", "Clinic settings", "Full access"] },
+];
+
+const LANGUAGES = ["Tamil", "Hindi", "Telugu", "Kannada", "Malayalam", "Marathi", "Bengali", "Gujarati", "Punjabi", "Urdu", "Odia", "Assamese"];
+
+const TESTIMONIALS = [
+  { text: "I used to spend 3 hours after clinic finishing paperwork. Now I finish everything before the patient leaves the room.", name: "Dr. Rajesh Kumar", role: "General Physician, Chennai", initials: "RK" },
+  { text: "My patients are impressed when they get the prescription on WhatsApp. The Tamil prescription header is brilliant.", name: "Dr. Priya Venkatesh", role: "Pediatrician, Coimbatore", initials: "PV" },
+  { text: "Finally a clinic software that works on my phone and understands when I speak in Hindi during consultation.", name: "Dr. Amit Sharma", role: "Family Medicine, Delhi", initials: "AS" },
+];
+
+const COMPARISON = [
+  { feature: "AI Voice Notes", ss: true, practo: false, evital: false, paper: false },
+  { feature: "Bilingual Rx", ss: true, practo: false, evital: false, paper: false },
+  { feature: "WhatsApp Sharing", ss: true, practo: false, evital: false, paper: false },
+  { feature: "Mobile Friendly", ss: true, practo: "partial", evital: false, paper: false },
+  { feature: "Regional Language", ss: true, practo: false, evital: false, paper: false },
+  { feature: "Modern UI", ss: true, practo: "partial", evital: false, paper: null },
+  { feature: "Price/month", ss: "₹799", practo: "₹1,500+", evital: "₹1,200+", paper: "—" },
+];
+
+const PLANS_MONTHLY = [
+  { name: "Solo Doctor", price: 799, features: ["1 Doctor", "Unlimited patients", "Voice to notes", "All templates", "WhatsApp sharing", "Analytics"], cta: "Start Free Trial", popular: false },
+  { name: "Small Clinic", price: 1499, features: ["Up to 5 Doctors", "Everything in Solo", "Multi-doctor queue", "Staff management", "Appointments", "Priority support"], cta: "Start Free Trial", popular: true },
+  { name: "Hospital Plan", price: 3999, features: ["Unlimited Doctors", "Everything in Small", "Multi-branch ready", "Custom branding", "Dedicated support", "Custom onboarding"], cta: "Contact Us", popular: false },
+];
+
+function ComparisonCell({ value }: { value: boolean | string | null }) {
+  if (value === true) return <span className="text-primary font-bold text-lg">✅</span>;
+  if (value === false) return <span className="text-muted-foreground">❌</span>;
+  if (value === "partial") return <span>⚠️</span>;
+  if (value === null) return <span className="text-muted-foreground">—</span>;
+  return <span className="text-sm font-medium">{value}</span>;
+}
+
+export default function LandingPage() {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [yearly, setYearly] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const scrollTo = (id: string) => {
+    setMobileOpen(false);
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  return (
+    <div className="min-h-screen bg-white" style={{ scrollBehavior: "smooth" }}>
+      {/* NAVBAR */}
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-white/80 backdrop-blur-lg shadow-sm" : "bg-transparent"}`}>
+        <div className="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
+          <div className="flex items-center gap-2">
+            <Stethoscope className="h-7 w-7 text-primary" />
+            <span className="text-xl font-bold text-foreground">StethoScribe</span>
+          </div>
+          <div className="hidden md:flex items-center gap-8">
+            {NAV_LINKS.map(l => (
+              <button key={l.href} onClick={() => scrollTo(l.href.slice(1))} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                {l.label}
+              </button>
+            ))}
+          </div>
+          <div className="hidden md:flex items-center gap-3">
+            <Link to="/auth"><Button variant="ghost" size="sm">Login</Button></Link>
+            <Link to="/auth"><Button size="sm">Start Free Trial <ChevronRight className="h-4 w-4" /></Button></Link>
+          </div>
+          <button className="md:hidden p-2" onClick={() => setMobileOpen(!mobileOpen)}>
+            {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
+        </div>
+        {mobileOpen && (
+          <div className="md:hidden bg-white border-t px-4 py-4 space-y-3 animate-fade-in">
+            {NAV_LINKS.map(l => (
+              <button key={l.href} onClick={() => scrollTo(l.href.slice(1))} className="block w-full text-left py-2 text-sm font-medium text-foreground">
+                {l.label}
+              </button>
+            ))}
+            <Link to="/auth" className="block"><Button className="w-full" size="sm">Start Free Trial</Button></Link>
+          </div>
+        )}
+      </nav>
+
+      {/* HERO */}
+      <section className="relative min-h-screen flex items-center overflow-hidden" style={{ background: "linear-gradient(135deg, #0D6E6E 0%, #0A8F8F 50%, #0D6E6E 100%)" }}>
+        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-24 pt-32 grid md:grid-cols-2 gap-12 items-center relative z-10">
+          <div className="animate-fade-in">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight tracking-tight">
+              AI-Powered Clinic Management Built for Indian Doctors
+            </h1>
+            <p className="mt-6 text-lg sm:text-xl text-white/80 max-w-lg">
+              Speak in Tamil, Hindi, Telugu or any Indian language. StethoScribe writes your clinical notes and sends the prescription to your patient's WhatsApp — automatically.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-4">
+              <Link to="/auth"><Button size="lg" className="bg-white text-primary hover:bg-white/90 font-semibold text-base px-6">Start Free Trial — 14 Days Free</Button></Link>
+              <Button size="lg" variant="outline" className="border-white/40 text-white hover:bg-white/10 text-base">Watch Demo →</Button>
+            </div>
+            <div className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-white/70 text-sm">
+              <span>🏥 Trusted by doctors</span>
+              <span>🇮🇳 Built for India</span>
+              <span>🔒 Secure & Private</span>
+              <span>📱 Works on any device</span>
+            </div>
+          </div>
+          <div className="hidden md:block">
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 shadow-2xl transform rotate-1 hover:rotate-0 transition-transform duration-500">
+              <div className="bg-white rounded-xl p-4 space-y-3">
+                <div className="flex items-center gap-2 text-primary font-semibold text-sm"><Stethoscope className="h-4 w-4" /> StethoScribe Prescription</div>
+                <div className="h-px bg-border" />
+                <div className="space-y-1 text-xs text-muted-foreground">
+                  <p className="font-medium text-foreground">Patient: Arun Kumar</p>
+                  <p>Date: 16 Apr 2026</p>
+                </div>
+                <div className="bg-muted rounded-lg p-3 space-y-1 text-xs">
+                  <p className="font-semibold text-foreground">Rx</p>
+                  <p>1. Tab Paracetamol 500mg — 1-0-1 × 3 days</p>
+                  <p>2. Tab Cetirizine 10mg — 0-0-1 × 5 days</p>
+                  <p>3. Syp Ambroxol 15ml — 1-1-1 × 5 days</p>
+                </div>
+                <div className="text-[10px] text-muted-foreground text-right">Sent via WhatsApp ✓</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* PROBLEM */}
+      <section className="py-20 bg-white">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-foreground">Every day, Indian doctors lose hours to paperwork</h2>
+          <div className="mt-12 grid sm:grid-cols-3 gap-8">
+            {PROBLEMS.map(p => (
+              <div key={p.stat} className="rounded-xl border bg-card p-8 text-center">
+                <p.icon className="h-10 w-10 text-primary mx-auto mb-4" />
+                <p className="text-2xl font-bold text-primary">{p.stat}</p>
+                <p className="text-muted-foreground mt-2">{p.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* HOW IT WORKS */}
+      <section id="how-it-works" className="py-20 bg-muted/30">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-foreground">From patient walk-in to WhatsApp prescription in minutes</h2>
+          <div className="mt-12 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            {STEPS.map((s, i) => (
+              <div key={s.num} className="flex md:flex-col items-center md:items-center gap-4 md:gap-2 flex-1 relative">
+                <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg flex-shrink-0">{s.num}</div>
+                {i < STEPS.length - 1 && <div className="hidden md:block absolute top-6 left-[calc(50%+24px)] w-[calc(100%-48px)] h-0.5 bg-primary/20" />}
+                <div className="md:text-center">
+                  <p className="font-semibold text-foreground text-sm">{s.title}</p>
+                  <p className="text-xs text-muted-foreground">{s.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FEATURES */}
+      <section id="features" className="py-20 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-foreground">Everything your clinic needs, powered by AI</h2>
+          <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {FEATURES.map(f => (
+              <div key={f.title} className="rounded-xl border border-primary/10 bg-card p-6 text-left hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                  <f.icon className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="font-semibold text-foreground text-lg">{f.title}</h3>
+                <p className="text-muted-foreground text-sm mt-2">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ROLES */}
+      <section className="py-20" style={{ background: "linear-gradient(135deg, #0D6E6E, #0A5C5C)" }}>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-white">One platform for your entire clinic</h2>
+          <div className="mt-12 grid sm:grid-cols-3 gap-6">
+            {ROLES.map(r => (
+              <div key={r.title} className="rounded-xl bg-white/10 backdrop-blur-sm border border-white/10 p-6 text-left">
+                <div className="text-4xl mb-3">{r.icon}</div>
+                <h3 className="text-xl font-bold text-white">{r.title}</h3>
+                <ul className="mt-4 space-y-2">
+                  {r.items.map(item => (
+                    <li key={item} className="text-white/80 text-sm flex items-center gap-2">
+                      <Check className="h-4 w-4 text-white/60 flex-shrink-0" /> {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* LANGUAGES */}
+      <section className="py-20 bg-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-foreground">Prescriptions in your patient's language</h2>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            {LANGUAGES.map(l => (
+              <span key={l} className="px-4 py-2 rounded-full border-2 border-primary/30 text-primary font-medium text-sm hover:bg-primary hover:text-primary-foreground transition-colors cursor-default">{l}</span>
+            ))}
+            <span className="px-4 py-2 rounded-full bg-primary/10 text-primary font-medium text-sm">+ more</span>
+          </div>
+          <p className="mt-6 text-muted-foreground max-w-lg mx-auto">
+            Clinic name, doctor name and all prescription labels appear in your regional language automatically.
+          </p>
+        </div>
+      </section>
+
+      {/* PRICING */}
+      <section id="pricing" className="py-20 bg-muted/30">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-foreground">Simple pricing, no surprises</h2>
+          <div className="mt-6 flex items-center justify-center gap-3">
+            <span className={`text-sm font-medium ${!yearly ? "text-foreground" : "text-muted-foreground"}`}>Monthly</span>
+            <Switch checked={yearly} onCheckedChange={setYearly} />
+            <span className={`text-sm font-medium ${yearly ? "text-foreground" : "text-muted-foreground"}`}>Yearly — Save 20%</span>
+          </div>
+          <div className="mt-10 grid sm:grid-cols-3 gap-6">
+            {PLANS_MONTHLY.map(plan => {
+              const price = yearly ? Math.round(plan.price * 0.8) : plan.price;
+              return (
+                <div key={plan.name} className={`rounded-2xl p-6 text-left transition-all duration-300 ${plan.popular ? "bg-primary text-primary-foreground shadow-xl scale-105 border-2 border-primary" : "bg-card border shadow-sm"}`}>
+                  {plan.popular && <span className="text-xs font-bold uppercase tracking-wider opacity-80">⭐ Most Popular</span>}
+                  <h3 className={`text-xl font-bold mt-2 ${plan.popular ? "" : "text-foreground"}`}>{plan.name}</h3>
+                  <div className="mt-3">
+                    {yearly && <span className={`text-sm line-through ${plan.popular ? "opacity-60" : "text-muted-foreground"}`}>₹{plan.price}</span>}
+                    <span className="text-4xl font-bold ml-1">₹{price}</span>
+                    <span className={`text-sm ${plan.popular ? "opacity-80" : "text-muted-foreground"}`}>/mo</span>
+                  </div>
+                  <ul className="mt-6 space-y-3">
+                    {plan.features.map(f => (
+                      <li key={f} className={`text-sm flex items-center gap-2 ${plan.popular ? "text-primary-foreground/90" : "text-muted-foreground"}`}>
+                        <Check className="h-4 w-4 flex-shrink-0" /> {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link to="/auth" className="block mt-6">
+                    <Button className={`w-full ${plan.popular ? "bg-white text-primary hover:bg-white/90" : ""}`} variant={plan.popular ? "default" : "outline"}>
+                      {plan.cta}
+                    </Button>
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-8 text-sm text-muted-foreground">All plans include 14-day free trial. No credit card required.</p>
+        </div>
+      </section>
+
+      {/* TESTIMONIALS */}
+      <section className="py-20 bg-white">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-foreground">Doctors love StethoScribe</h2>
+          <div className="mt-12 grid sm:grid-cols-3 gap-6">
+            {TESTIMONIALS.map(t => (
+              <div key={t.name} className="rounded-xl border bg-card p-6 text-left shadow-sm">
+                <div className="flex gap-1 text-yellow-400 mb-3">{Array(5).fill(0).map((_, i) => <Star key={i} className="h-4 w-4 fill-current" />)}</div>
+                <p className="text-sm text-muted-foreground italic">"{t.text}"</p>
+                <div className="mt-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary font-bold text-sm flex items-center justify-center">{t.initials}</div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{t.name}</p>
+                    <p className="text-xs text-muted-foreground">{t.role}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* COMPARISON */}
+      <section className="py-20 bg-muted/30">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-foreground">See how StethoScribe compares</h2>
+          <div className="mt-10 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-3 px-3 text-muted-foreground font-medium">Feature</th>
+                  <th className="py-3 px-3 font-bold text-primary bg-primary/5 rounded-t-lg">StethoScribe</th>
+                  <th className="py-3 px-3 text-muted-foreground font-medium">Practo</th>
+                  <th className="py-3 px-3 text-muted-foreground font-medium">eVital</th>
+                  <th className="py-3 px-3 text-muted-foreground font-medium">Paper</th>
+                </tr>
+              </thead>
+              <tbody>
+                {COMPARISON.map((row, i) => (
+                  <tr key={row.feature} className={i % 2 === 0 ? "bg-white" : ""}>
+                    <td className="text-left py-3 px-3 font-medium text-foreground">{row.feature}</td>
+                    <td className="py-3 px-3 bg-primary/5"><ComparisonCell value={row.ss} /></td>
+                    <td className="py-3 px-3"><ComparisonCell value={row.practo} /></td>
+                    <td className="py-3 px-3"><ComparisonCell value={row.evital} /></td>
+                    <td className="py-3 px-3"><ComparisonCell value={row.paper} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA BANNER */}
+      <section className="py-20" style={{ background: "linear-gradient(135deg, #0D6E6E, #0A8F8F)" }}>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-white">Ready to transform your clinic?</h2>
+          <p className="mt-4 text-lg text-white/80">Join doctors across India who save hours every day with AI-powered clinic management.</p>
+          <Link to="/auth">
+            <Button size="lg" className="mt-8 bg-white text-primary hover:bg-white/90 font-semibold text-base px-8">
+              Start Your Free Trial Today →
+            </Button>
+          </Link>
+          <p className="mt-4 text-white/60 text-sm">No credit card required • Setup in 10 minutes • Cancel anytime</p>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer id="contact" className="py-12" style={{ background: "#1A1A2E" }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="grid sm:grid-cols-3 gap-8">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Stethoscope className="h-6 w-6 text-white" />
+                <span className="text-lg font-bold text-white">StethoScribe</span>
+              </div>
+              <p className="text-sm text-gray-400">AI-powered clinic management built for Indian doctors.</p>
+            </div>
+            <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+              <button onClick={() => scrollTo("features")} className="text-gray-400 hover:text-white transition-colors">Features</button>
+              <button onClick={() => scrollTo("pricing")} className="text-gray-400 hover:text-white transition-colors">Pricing</button>
+              <button onClick={() => scrollTo("contact")} className="text-gray-400 hover:text-white transition-colors">Contact</button>
+              <span className="text-gray-400">Privacy</span>
+              <span className="text-gray-400">Terms</span>
+            </div>
+            <div className="text-sm text-gray-400 space-y-1">
+              <p>📧 hello@stethoscribe.app</p>
+              <p>📱 +91 XXXXX XXXXX</p>
+            </div>
+          </div>
+          <div className="mt-8 pt-6 border-t border-white/10 flex flex-wrap justify-between text-xs text-gray-500">
+            <span>© 2026 StethoScribe. All rights reserved.</span>
+            <span>Made with ❤️ in India</span>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
