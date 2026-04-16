@@ -1,8 +1,50 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Menu, X, Mic, FileText, MessageSquare, ClipboardList, Calendar, BarChart3, Stethoscope, Clock, PenLine, Frown, Check, Star, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { motion, useInView, useSpring, useMotionValue, useTransform } from "framer-motion";
+
+// --- Animated counter component ---
+function CountUp({ value, suffix = "" }: { value: string; suffix?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-50px" });
+  const numMatch = value.match(/^(\d+)/);
+  const num = numMatch ? parseInt(numMatch[1]) : 0;
+  const rest = numMatch ? value.slice(numMatch[0].length) : value;
+
+  const motionVal = useMotionValue(0);
+  const spring = useSpring(motionVal, { duration: 1500, bounce: 0 });
+  const display = useTransform(spring, (v) => `${Math.round(v)}${rest}${suffix}`);
+
+  useEffect(() => {
+    if (isInView && num > 0) motionVal.set(num);
+  }, [isInView, num, motionVal]);
+
+  if (num === 0) return <span ref={ref}>{value}{suffix}</span>;
+  return <motion.span ref={ref}>{display}</motion.span>;
+}
+
+// --- Reusable fade-up wrapper ---
+const fadeUp = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0 },
+};
+
+const staggerContainer = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.1 } },
+};
+
+const slideInLeft = {
+  hidden: { opacity: 0, x: -40 },
+  visible: { opacity: 1, x: 0 },
+};
+
+const slideInRight = {
+  hidden: { opacity: 0, x: 40 },
+  visible: { opacity: 1, x: 0 },
+};
 
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
@@ -128,26 +170,26 @@ export default function LandingPage() {
       <section className="relative min-h-screen flex items-center overflow-hidden" style={{ background: "linear-gradient(135deg, #0D6E6E 0%, #0A8F8F 50%, #0D6E6E 100%)" }}>
         <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-24 pt-32 grid md:grid-cols-2 gap-12 items-center relative z-10">
-          <div className="animate-fade-in">
+          <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: "easeOut" }}>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight tracking-tight">
               AI-Powered Clinic Management Built for Indian Doctors
             </h1>
             <p className="mt-6 text-lg sm:text-xl text-white/80 max-w-lg">
               Speak in Tamil, Hindi, Telugu or any Indian language. StethoScribe writes your clinical notes and sends the prescription to your patient's WhatsApp — automatically.
             </p>
-            <div className="mt-8 flex flex-wrap gap-4">
+            <motion.div className="mt-8 flex flex-wrap gap-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 0.6 }}>
               <Link to="/auth"><Button size="lg" className="bg-white text-primary hover:bg-white/90 font-semibold text-base px-6">Start Free Trial — 14 Days Free</Button></Link>
               <Button size="lg" variant="outline" className="border-white/40 text-white hover:bg-white/10 text-base">Watch Demo →</Button>
-            </div>
-            <div className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-white/70 text-sm">
+            </motion.div>
+            <motion.div className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-white/70 text-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8, duration: 0.6 }}>
               <span>🏥 Trusted by doctors</span>
               <span>🇮🇳 Built for India</span>
               <span>🔒 Secure & Private</span>
               <span>📱 Works on any device</span>
-            </div>
-          </div>
-          <div className="hidden md:block">
-            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 shadow-2xl transform rotate-1 hover:rotate-0 transition-transform duration-500">
+            </motion.div>
+          </motion.div>
+          <motion.div className="hidden md:block" initial={{ opacity: 0, x: 60, rotate: 3 }} animate={{ opacity: 1, x: 0, rotate: 1 }} transition={{ duration: 0.9, delay: 0.3 }}>
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 shadow-2xl hover:rotate-0 transition-transform duration-500">
               <div className="bg-white rounded-xl p-4 space-y-3">
                 <div className="flex items-center gap-2 text-primary font-semibold text-sm"><Stethoscope className="h-4 w-4" /> StethoScribe Prescription</div>
                 <div className="h-px bg-border" />
@@ -164,47 +206,51 @@ export default function LandingPage() {
                 <div className="text-[10px] text-muted-foreground text-right">Sent via WhatsApp ✓</div>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* PROBLEM */}
       <section className="py-20 bg-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold text-foreground">Every day, Indian doctors lose hours to paperwork</h2>
-          <div className="mt-12 grid sm:grid-cols-3 gap-8">
-            {PROBLEMS.map(p => (
-              <div key={p.stat} className="rounded-xl border bg-card p-8 text-center">
+          <motion.h2 className="text-3xl sm:text-4xl font-bold text-foreground" variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.6 }}>
+            Every day, Indian doctors lose hours to paperwork
+          </motion.h2>
+          <motion.div className="mt-12 grid sm:grid-cols-3 gap-8" variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }}>
+            {PROBLEMS.map((p, i) => (
+              <motion.div key={p.stat} variants={fadeUp} transition={{ duration: 0.5, delay: i * 0.15 }} className="rounded-xl border bg-card p-8 text-center">
                 <p.icon className="h-10 w-10 text-primary mx-auto mb-4" />
-                <p className="text-2xl font-bold text-primary">{p.stat}</p>
+                <p className="text-2xl font-bold text-primary"><CountUp value={p.stat} /></p>
                 <p className="text-muted-foreground mt-2">{p.desc}</p>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* HOW IT WORKS */}
       <section id="how-it-works" className="py-20 bg-muted/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold text-foreground">From patient walk-in to WhatsApp prescription in minutes</h2>
+          <motion.h2 className="text-3xl sm:text-4xl font-bold text-foreground" variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.6 }}>
+            From patient walk-in to WhatsApp prescription in minutes
+          </motion.h2>
           {/* Desktop: horizontal flow */}
-          <div className="mt-12 hidden md:flex items-center justify-between gap-4">
+          <motion.div className="mt-12 hidden md:flex items-center justify-between gap-4" variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true }}>
             {STEPS.map((s, i) => (
-              <div key={s.num} className="flex flex-col items-center gap-2 flex-1 relative">
+              <motion.div key={s.num} variants={fadeUp} transition={{ duration: 0.4, delay: i * 0.12 }} className="flex flex-col items-center gap-2 flex-1 relative">
                 <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg flex-shrink-0">{s.num}</div>
                 {i < STEPS.length - 1 && <div className="absolute top-6 left-[calc(50%+24px)] w-[calc(100%-48px)] h-0.5 bg-primary/20" />}
                 <div className="text-center">
                   <p className="font-semibold text-foreground text-sm">{s.title}</p>
                   <p className="text-xs text-muted-foreground">{s.desc}</p>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
           {/* Mobile: vertical timeline */}
-          <div className="mt-12 md:hidden flex flex-col items-start gap-0 max-w-xs mx-auto">
+          <motion.div className="mt-12 md:hidden flex flex-col items-start gap-0 max-w-xs mx-auto" variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true }}>
             {STEPS.map((s, i) => (
-              <div key={s.num} className="flex items-start gap-4 relative">
+              <motion.div key={s.num} variants={slideInLeft} transition={{ duration: 0.4, delay: i * 0.1 }} className="flex items-start gap-4 relative">
                 <div className="flex flex-col items-center">
                   <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm flex-shrink-0 z-10">{s.num}</div>
                   {i < STEPS.length - 1 && <div className="w-0.5 h-8 bg-primary/20" />}
@@ -213,37 +259,41 @@ export default function LandingPage() {
                   <p className="font-semibold text-foreground text-sm">{s.title}</p>
                   <p className="text-xs text-muted-foreground">{s.desc}</p>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* FEATURES */}
       <section id="features" className="py-20 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold text-foreground">Everything your clinic needs, powered by AI</h2>
-          <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {FEATURES.map(f => (
-              <div key={f.title} className="rounded-xl border border-primary/10 bg-card p-6 text-left hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+          <motion.h2 className="text-3xl sm:text-4xl font-bold text-foreground" variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.6 }}>
+            Everything your clinic needs, powered by AI
+          </motion.h2>
+          <motion.div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-6" variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }}>
+            {FEATURES.map((f, i) => (
+              <motion.div key={f.title} variants={fadeUp} transition={{ duration: 0.5, delay: i * 0.1 }} className="rounded-xl border border-primary/10 bg-card p-6 text-left hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group">
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
                   <f.icon className="h-6 w-6 text-primary" />
                 </div>
                 <h3 className="font-semibold text-foreground text-lg">{f.title}</h3>
                 <p className="text-muted-foreground text-sm mt-2">{f.desc}</p>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* ROLES */}
       <section className="py-20" style={{ background: "linear-gradient(135deg, #0D6E6E, #0A5C5C)" }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold text-white">One platform for your entire clinic</h2>
-          <div className="mt-12 grid sm:grid-cols-3 gap-6">
-            {ROLES.map(r => (
-              <div key={r.title} className="rounded-xl bg-white/10 backdrop-blur-sm border border-white/10 p-6 text-left">
+          <motion.h2 className="text-3xl sm:text-4xl font-bold text-white" variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.6 }}>
+            One platform for your entire clinic
+          </motion.h2>
+          <motion.div className="mt-12 grid sm:grid-cols-3 gap-6" variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+            {ROLES.map((r, i) => (
+              <motion.div key={r.title} variants={fadeUp} transition={{ duration: 0.5, delay: i * 0.15 }} className="rounded-xl bg-white/10 backdrop-blur-sm border border-white/10 p-6 text-left">
                 <div className="text-4xl mb-3">{r.icon}</div>
                 <h3 className="text-xl font-bold text-white">{r.title}</h3>
                 <ul className="mt-4 space-y-2">
@@ -253,42 +303,46 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* LANGUAGES */}
       <section className="py-20 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold text-foreground">Prescriptions in your patient's language</h2>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            {LANGUAGES.map(l => (
-              <span key={l} className="px-4 py-2 rounded-full border-2 border-primary/30 text-primary font-medium text-sm hover:bg-primary hover:text-primary-foreground transition-colors cursor-default">{l}</span>
+          <motion.h2 className="text-3xl sm:text-4xl font-bold text-foreground" variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.6 }}>
+            Prescriptions in your patient's language
+          </motion.h2>
+          <motion.div className="mt-8 flex flex-wrap justify-center gap-3" variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+            {LANGUAGES.map((l, i) => (
+              <motion.span key={l} variants={fadeUp} transition={{ duration: 0.3, delay: i * 0.04 }} className="px-4 py-2 rounded-full border-2 border-primary/30 text-primary font-medium text-sm hover:bg-primary hover:text-primary-foreground transition-colors cursor-default">{l}</motion.span>
             ))}
-            <span className="px-4 py-2 rounded-full bg-primary/10 text-primary font-medium text-sm">+ more</span>
-          </div>
-          <p className="mt-6 text-muted-foreground max-w-lg mx-auto">
+            <motion.span variants={fadeUp} transition={{ duration: 0.3, delay: 0.5 }} className="px-4 py-2 rounded-full bg-primary/10 text-primary font-medium text-sm">+ more</motion.span>
+          </motion.div>
+          <motion.p className="mt-6 text-muted-foreground max-w-lg mx-auto" variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.3 }}>
             Clinic name, doctor name and all prescription labels appear in your regional language automatically.
-          </p>
+          </motion.p>
         </div>
       </section>
 
       {/* PRICING */}
       <section id="pricing" className="py-20 bg-muted/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold text-foreground">Simple pricing, no surprises</h2>
+          <motion.h2 className="text-3xl sm:text-4xl font-bold text-foreground" variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.6 }}>
+            Simple pricing, no surprises
+          </motion.h2>
           <div className="mt-6 flex items-center justify-center gap-3">
             <span className={`text-sm font-medium ${!yearly ? "text-foreground" : "text-muted-foreground"}`}>Monthly</span>
             <Switch checked={yearly} onCheckedChange={setYearly} />
             <span className={`text-sm font-medium ${yearly ? "text-foreground" : "text-muted-foreground"}`}>Yearly — Save 20%</span>
           </div>
-          <div className="mt-10 grid sm:grid-cols-3 gap-6">
-            {PLANS_MONTHLY.map(plan => {
+          <motion.div className="mt-10 grid sm:grid-cols-3 gap-6" variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+            {PLANS_MONTHLY.map((plan, i) => {
               const price = yearly ? Math.round(plan.price * 0.8) : plan.price;
               return (
-                <div key={plan.name} className={`rounded-2xl p-6 text-left transition-all duration-300 ${plan.popular ? "bg-primary text-primary-foreground shadow-xl scale-105 border-2 border-primary" : "bg-card border shadow-sm"}`}>
+                <motion.div key={plan.name} variants={fadeUp} transition={{ duration: 0.5, delay: i * 0.15 }} className={`rounded-2xl p-6 text-left transition-all duration-300 ${plan.popular ? "bg-primary text-primary-foreground shadow-xl scale-105 border-2 border-primary" : "bg-card border shadow-sm"}`}>
                   {plan.popular && <span className="text-xs font-bold uppercase tracking-wider opacity-80">⭐ Most Popular</span>}
                   <h3 className={`text-xl font-bold mt-2 ${plan.popular ? "" : "text-foreground"}`}>{plan.name}</h3>
                   <div className="mt-3">
@@ -308,10 +362,10 @@ export default function LandingPage() {
                       {plan.cta}
                     </Button>
                   </Link>
-                </div>
+                </motion.div>
               );
             })}
-          </div>
+          </motion.div>
           <p className="mt-8 text-sm text-muted-foreground">All plans include 14-day free trial. No credit card required.</p>
         </div>
       </section>
@@ -319,11 +373,13 @@ export default function LandingPage() {
       {/* TESTIMONIALS */}
       <section className="py-20 bg-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold text-foreground">Doctors love StethoScribe</h2>
-          <div className="mt-12 grid sm:grid-cols-3 gap-6">
-            {TESTIMONIALS.map(t => (
-              <div key={t.name} className="rounded-xl border bg-card p-6 text-left shadow-sm">
-                <div className="flex gap-1 text-yellow-400 mb-3">{Array(5).fill(0).map((_, i) => <Star key={i} className="h-4 w-4 fill-current" />)}</div>
+          <motion.h2 className="text-3xl sm:text-4xl font-bold text-foreground" variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.6 }}>
+            Doctors love StethoScribe
+          </motion.h2>
+          <motion.div className="mt-12 grid sm:grid-cols-3 gap-6" variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }}>
+            {TESTIMONIALS.map((t, i) => (
+              <motion.div key={t.name} variants={i === 0 ? slideInLeft : i === 2 ? slideInRight : fadeUp} transition={{ duration: 0.6, delay: i * 0.15 }} className="rounded-xl border bg-card p-6 text-left shadow-sm">
+                <div className="flex gap-1 text-yellow-400 mb-3">{Array(5).fill(0).map((_, j) => <Star key={j} className="h-4 w-4 fill-current" />)}</div>
                 <p className="text-sm text-muted-foreground italic">"{t.text}"</p>
                 <div className="mt-4 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-primary/10 text-primary font-bold text-sm flex items-center justify-center">{t.initials}</div>
@@ -332,17 +388,19 @@ export default function LandingPage() {
                     <p className="text-xs text-muted-foreground">{t.role}</p>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* COMPARISON */}
       <section className="py-20 bg-muted/30">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">See how StethoScribe compares</h2>
-          <div className="mt-10 overflow-x-auto -mx-4 px-4">
+          <motion.h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground" variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.6 }}>
+            See how StethoScribe compares
+          </motion.h2>
+          <motion.div className="mt-10 overflow-x-auto -mx-4 px-4" variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.6, delay: 0.2 }}>
             <table className="w-full text-xs sm:text-sm min-w-0">
               <thead>
                 <tr className="border-b">
@@ -365,20 +423,26 @@ export default function LandingPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* CTA BANNER */}
       <section className="py-20" style={{ background: "linear-gradient(135deg, #0D6E6E, #0A8F8F)" }}>
         <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold text-white">Ready to transform your clinic?</h2>
-          <p className="mt-4 text-lg text-white/80">Join doctors across India who save hours every day with AI-powered clinic management.</p>
-          <Link to="/auth">
-            <Button size="lg" className="mt-8 bg-white text-primary hover:bg-white/90 font-semibold text-base px-8">
-              Start Your Free Trial Today →
-            </Button>
-          </Link>
+          <motion.h2 className="text-3xl sm:text-4xl font-bold text-white" variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.6 }}>
+            Ready to transform your clinic?
+          </motion.h2>
+          <motion.p className="mt-4 text-lg text-white/80" variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.2 }}>
+            Join doctors across India who save hours every day with AI-powered clinic management.
+          </motion.p>
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.4 }}>
+            <Link to="/auth">
+              <Button size="lg" className="mt-8 bg-white text-primary hover:bg-white/90 font-semibold text-base px-8">
+                Start Your Free Trial Today →
+              </Button>
+            </Link>
+          </motion.div>
           <p className="mt-4 text-white/60 text-sm">No credit card required • Setup in 10 minutes • Cancel anytime</p>
         </div>
       </section>
