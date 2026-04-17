@@ -40,46 +40,61 @@ export default function PatientHistory({ patientId, currentVisitId }: Props) {
   const [labOrders, setLabOrders] = useState<LabOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchHistory = async () => {
-      setLoading(true);
-      const [historyRes, labRes] = await Promise.all([
-        supabase
-          .from("visits")
-          .select(`
-            id, visit_date, token_number, chief_complaint, status,
-            doctors(name, qualification),
-            clinical_notes(soap_notes, raw_transcript),
-            prescriptions(id, medications, investigations, follow_up_date, pdf_url)
-          `)
-          .eq("patient_id", patientId)
-          .neq("id", currentVisitId)
-          .order("visit_date", { ascending: false })
-          .limit(20),
-        supabase
-          .from("lab_orders")
-          .select("id, test_name, test_category, status, urgency, ordered_at, labs(name), lab_results(id, ai_summary, status, uploaded_at)")
-          .eq("patient_id", patientId)
-          .order("ordered_at", { ascending: false })
-          .limit(20),
-      ]);
+  const fetchHistory = async () => {
+    setLoading(true);
+    const [historyRes, labRes] = await Promise.all([
+      supabase
+        .from("visits")
+        .select(`
+          id, visit_date, token_number, chief_complaint, status,
+          doctors(name, qualification),
+          clinical_notes(soap_notes, raw_transcript),
+          prescriptions(id, medications, investigations, follow_up_date, pdf_url)
+        `)
+        .eq("patient_id", patientId)
+        .neq("id", currentVisitId)
+        .order("visit_date", { ascending: false })
+        .limit(20),
+      supabase
+        .from("lab_orders")
+        .select("id, test_name, test_category, status, urgency, ordered_at, labs(name), lab_results(id, ai_summary, status, uploaded_at)")
+        .eq("patient_id", patientId)
+        .order("ordered_at", { ascending: false })
+        .limit(20),
+    ]);
 
-      if (!historyRes.error && historyRes.data) {
-        setHistory(historyRes.data.map((v: any) => ({
-          ...v,
-          doctors: Array.isArray(v.doctors) ? v.doctors[0] ?? null : v.doctors,
-        })));
-      }
-      if (!labRes.error && labRes.data) {
-        setLabOrders(labRes.data.map((o: any) => ({
-          ...o,
-          labs: Array.isArray(o.labs) ? o.labs[0] ?? null : o.labs,
-          lab_results: o.lab_results || [],
-        })));
-      }
-      setLoading(false);
-    };
+    if (!historyRes.error && historyRes.data) {
+      setHistory(historyRes.data.map((v: any) => ({
+        ...v,
+        doctors: Array.isArray(v.doctors) ? v.doctors[0] ?? null : v.doctors,
+      })));
+    }
+    if (!labRes.error && labRes.data) {
+      setLabOrders(labRes.data.map((o: any) => ({
+        ...o,
+        labs: Array.isArray(o.labs) ? o.labs[0] ?? null : o.labs,
+        lab_results: o.lab_results || [],
+      })));
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
     fetchHistory();
+    if (!patientId) return;
+    const channel = supabase
+      .channel(`patient-history-orders-${patientId}`)
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "lab_orders", filter: `patient_id=eq.${patientId}` },
+        () => fetchHistory()
+      )
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "lab_results", filter: `patient_id=eq.${patientId}` },
+        () => fetchHistory()
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patientId, currentVisitId]);
 
   if (loading) {
