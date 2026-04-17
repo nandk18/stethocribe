@@ -659,6 +659,36 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
             </div>
             <Input value={investigations} onChange={e => setInvestigations(e.target.value)} placeholder="CBC, LFT, ECG..." className="rounded-lg" />
             <p className="text-xs text-muted-foreground">Tests listed here appear on the prescription. Use "Order to Lab" to send a structured order to a registered lab.</p>
+
+            {visitLabOrders.length > 0 && (
+              <div className="mt-3 rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                  <FlaskConical className="h-3.5 w-3.5 text-primary" />
+                  Lab orders placed this visit ({visitLabOrders.length})
+                </div>
+                <ul className="space-y-1.5">
+                  {visitLabOrders.map(o => (
+                    <li key={o.id} className="flex items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-medium text-foreground truncate">{o.test_name}</span>
+                        {o.test_category && <span className="text-muted-foreground">· {o.test_category}</span>}
+                        {o.lab?.name && <span className="text-muted-foreground truncate">→ {o.lab.name}</span>}
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {o.urgency && o.urgency !== "routine" && (
+                          <Badge variant={o.urgency === "stat" ? "destructive" : "secondary"} className="text-[10px] px-1.5 py-0 h-4 uppercase">
+                            {o.urgency}
+                          </Badge>
+                        )}
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 capitalize">
+                          {o.status || "ordered"}
+                        </Badge>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2"><Label className="font-semibold">Follow-up Date</Label><Input type="date" value={followUpDate} onChange={e => setFollowUpDate(e.target.value)} className="rounded-lg" /></div>
