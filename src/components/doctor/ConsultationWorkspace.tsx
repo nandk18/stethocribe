@@ -502,6 +502,7 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
           doctorId={doctor.id}
           doctorName={doctor.name || "Doctor"}
           clinicName={clinic?.name || "Clinic"}
+          onOrdered={fetchVisitLabOrders}
         />
       )}
 
