@@ -146,6 +146,16 @@ export default function LabResultsInbox() {
     navigate(`/dashboard/patients/${result.patient_id}`);
   };
 
+  const handleCancelOrder = async (orderId: string) => {
+    const { error } = await supabase
+      .from("lab_orders")
+      .update({ status: "cancelled" })
+      .eq("id", orderId);
+    if (error) { toast.error("Failed to cancel order"); return; }
+    toast.success("Lab order cancelled");
+    fetchPendingOrders();
+  };
+
   const pendingCount = results.filter(r => r.status === "pending_review").length;
 
   return (
@@ -199,11 +209,16 @@ export default function LabResultsInbox() {
                         {o.ordered_at && new Date(o.ordered_at).toLocaleString()}
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground mb-3">
                       Patient: <span className="font-medium text-foreground">{o.patient?.name}</span>
                       {o.patient?.healthcare_id && <span className="font-mono text-primary"> · {o.patient.healthcare_id}</span>}
                       {o.lab?.name ? <span> · sent to {o.lab.name}</span> : <span> · no lab assigned</span>}
                     </p>
+                    <div className="flex justify-end">
+                      <Button size="sm" variant="outline" onClick={() => handleCancelOrder(o.id)} className="rounded-lg text-xs text-destructive hover:text-destructive">
+                        Cancel Order
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))
