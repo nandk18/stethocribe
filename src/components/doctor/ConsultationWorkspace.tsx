@@ -697,6 +697,15 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 capitalize">
                           {o.status || "ordered"}
                         </Badge>
+                        {(o.status === "ordered" || !o.status) && (
+                          <button
+                            type="button"
+                            onClick={() => handleCancelLabOrder(o.id, o.test_name)}
+                            className="text-[10px] font-medium text-destructive/80 hover:text-destructive hover:underline ml-0.5"
+                          >
+                            Cancel
+                          </button>
+                        )}
                       </div>
                     </li>
                   ))}
