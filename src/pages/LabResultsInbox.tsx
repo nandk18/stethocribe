@@ -36,11 +36,23 @@ const statusBadgeClass = (status?: string) => {
   }
 };
 
+type PendingOrder = {
+  id: string;
+  test_name: string;
+  test_category: string | null;
+  urgency: string | null;
+  status: string | null;
+  ordered_at: string | null;
+  patient: { name: string; healthcare_id: string | null } | null;
+  lab: { name: string } | null;
+};
+
 export default function LabResultsInbox() {
   const { profile } = useAuth();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"all" | "pending_review" | "reviewed">("pending_review");
+  const [tab, setTab] = useState<"pending_orders" | "pending_review" | "reviewed" | "all">("pending_orders");
   const [results, setResults] = useState<LabResult[]>([]);
+  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<LabResult | null>(null);
 
@@ -58,7 +70,7 @@ export default function LabResultsInbox() {
       .eq("clinic_id", profile.clinic_id)
       .order("uploaded_at", { ascending: false });
 
-    if (tab !== "all") query = query.eq("status", tab);
+    if (tab === "pending_review" || tab === "reviewed") query = query.eq("status", tab);
 
     const { data, error } = await query;
     if (!error && data) {
@@ -72,7 +84,29 @@ export default function LabResultsInbox() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchResults(); }, [profile, tab]);
+  const fetchPendingOrders = async () => {
+    if (!profile?.clinic_id) return;
+    const { data } = await supabase
+      .from("lab_orders")
+      .select("id, test_name, test_category, urgency, status, ordered_at, patients(name, healthcare_id), labs(name)")
+      .eq("clinic_id", profile.clinic_id)
+      .eq("status", "ordered")
+      .order("ordered_at", { ascending: false });
+    setPendingOrders((data || []).map((o: any) => ({
+      ...o,
+      patient: Array.isArray(o.patients) ? o.patients[0] : o.patients,
+      lab: Array.isArray(o.labs) ? o.labs[0] : o.labs,
+    })));
+  };
+
+  useEffect(() => {
+    if (tab === "pending_orders") {
+      fetchPendingOrders();
+      setLoading(false);
+    } else {
+      fetchResults();
+    }
+  }, [profile, tab]);
 
   // Realtime
   useEffect(() => {
@@ -80,7 +114,10 @@ export default function LabResultsInbox() {
     const channel = supabase.channel("lab-results-" + profile.clinic_id)
       .on("postgres_changes",
         { event: "*", schema: "public", table: "lab_results", filter: `clinic_id=eq.${profile.clinic_id}` },
-        () => fetchResults())
+        () => { fetchResults(); fetchPendingOrders(); })
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "lab_orders", filter: `clinic_id=eq.${profile.clinic_id}` },
+        () => fetchPendingOrders())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [profile?.clinic_id, tab]);
@@ -123,16 +160,54 @@ export default function LabResultsInbox() {
 
       <Tabs value={tab} onValueChange={(v: any) => setTab(v)}>
         <TabsList className="rounded-xl">
-          <TabsTrigger value="all" className="rounded-lg">All</TabsTrigger>
+          <TabsTrigger value="pending_orders" className="rounded-lg">
+            Pending Orders {pendingOrders.length > 0 && <Badge variant="secondary" className="ml-2 h-5 text-xs">{pendingOrders.length}</Badge>}
+          </TabsTrigger>
           <TabsTrigger value="pending_review" className="rounded-lg">
-            Pending Review {pendingCount > 0 && tab === "pending_review" && <Badge className="ml-2 h-5 text-xs">{pendingCount}</Badge>}
+            Pending Review {pendingCount > 0 && <Badge className="ml-2 h-5 text-xs">{pendingCount}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="reviewed" className="rounded-lg">Reviewed</TabsTrigger>
+          <TabsTrigger value="all" className="rounded-lg">All Results</TabsTrigger>
         </TabsList>
 
         <TabsContent value={tab} className="space-y-3 mt-4">
           {loading ? (
             <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+          ) : tab === "pending_orders" ? (
+            pendingOrders.length === 0 ? (
+              <Card className="rounded-2xl border-0 shadow-sm">
+                <CardContent className="flex flex-col items-center py-16 text-center">
+                  <FlaskConical className="h-12 w-12 text-muted-foreground/30 mb-3" />
+                  <p className="font-display font-semibold text-muted-foreground">No pending orders</p>
+                  <p className="text-xs text-muted-foreground mt-1">Orders awaiting lab upload will appear here.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              pendingOrders.map(o => (
+                <Card key={o.id} className="rounded-2xl border-0 shadow-sm">
+                  <CardContent className="p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-display font-semibold text-foreground">{o.test_name}</h3>
+                        {o.test_category && <Badge variant="outline" className="rounded-md text-xs">{o.test_category}</Badge>}
+                        {o.urgency && o.urgency !== "routine" && (
+                          <Badge variant={o.urgency === "stat" ? "destructive" : "secondary"} className="rounded-md text-xs uppercase">{o.urgency}</Badge>
+                        )}
+                        <Badge variant="outline" className="rounded-md text-xs bg-warning/10 text-warning border-warning/20">Awaiting upload</Badge>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {o.ordered_at && new Date(o.ordered_at).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Patient: <span className="font-medium text-foreground">{o.patient?.name}</span>
+                      {o.patient?.healthcare_id && <span className="font-mono text-primary"> · {o.patient.healthcare_id}</span>}
+                      {o.lab?.name ? <span> · sent to {o.lab.name}</span> : <span> · no lab assigned</span>}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))
+            )
           ) : results.length === 0 ? (
             <Card className="rounded-2xl border-0 shadow-sm">
               <CardContent className="flex flex-col items-center py-16 text-center">
