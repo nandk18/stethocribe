@@ -162,6 +162,20 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visit.id]);
 
+  const handleCancelLabOrder = async (orderId: string, testName: string) => {
+    if (!confirm(`Cancel the lab order for "${testName}"? The lab will no longer see it as pending.`)) return;
+    const { error } = await supabase
+      .from("lab_orders")
+      .update({ status: "cancelled" })
+      .eq("id", orderId);
+    if (error) {
+      toast.error(error.message || "Failed to cancel order");
+      return;
+    }
+    toast.success("Lab order cancelled");
+    fetchVisitLabOrders();
+  };
+
   const getAge = (dob: string | null) => {
     if (!dob) return "N/A";
     return Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
