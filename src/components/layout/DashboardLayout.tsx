@@ -5,7 +5,7 @@ import { NavLink } from "@/components/NavLink";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
-  Stethoscope, Users, CalendarDays, Settings, LogOut, UserPlus, Menu, X, FileText, BarChart2, Calendar
+  Stethoscope, Users, CalendarDays, Settings, LogOut, UserPlus, Menu, X, FileText, BarChart2, Calendar, FlaskConical
 } from "lucide-react";
 
 const receptionistLinks = [
@@ -18,6 +18,7 @@ const receptionistLinks = [
 const doctorLinks = [
   { to: "/dashboard", icon: CalendarDays, label: "Queue & Consult" },
   { to: "/dashboard/patients", icon: Users, label: "Patients" },
+  { to: "/dashboard/lab-results", icon: FlaskConical, label: "Lab Results" },
   { to: "/dashboard/templates", icon: FileText, label: "Templates" },
   { to: "/dashboard/settings", icon: Settings, label: "Settings" },
 ];
@@ -26,6 +27,7 @@ const adminLinks = [
   { to: "/dashboard", icon: CalendarDays, label: "Queue" },
   { to: "/dashboard/appointments", icon: Calendar, label: "Appointments" },
   { to: "/dashboard/patients", icon: Users, label: "Patients" },
+  { to: "/dashboard/lab-results", icon: FlaskConical, label: "Lab Results" },
   { to: "/dashboard/templates", icon: FileText, label: "Templates" },
   { to: "/dashboard/analytics", icon: BarChart2, label: "Analytics" },
   { to: "/dashboard/settings", icon: Settings, label: "Settings" },

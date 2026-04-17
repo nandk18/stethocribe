@@ -6,8 +6,9 @@ type UserProfile = {
   id: string;
   user_id: string;
   clinic_id: string | null;
+  lab_id: string | null;
   full_name: string | null;
-  role: "admin" | "doctor" | "receptionist";
+  role: "admin" | "doctor" | "receptionist" | "lab";
 };
 
 type AuthContextType = {

@@ -21,6 +21,8 @@ import Settings from "./pages/Settings";
 import TemplatesPage from "./pages/TemplatesPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import AppointmentsPage from "./pages/AppointmentsPage";
+import LabDashboard from "./pages/LabDashboard";
+import LabResultsInbox from "./pages/LabResultsInbox";
 import NotFound from "./pages/NotFound";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -91,12 +93,27 @@ function AppRoutes() {
 
   // Role-based dashboard
   const role = profile?.role;
+
+  // Lab users have a separate portal
+  if (role === "lab") {
+    return (
+      <Routes>
+        <Route path="/lab" element={<LabDashboard />} />
+        <Route path="/rx/:prescriptionId" element={<PrescriptionViewer />} />
+        <Route path="*" element={<Navigate to="/lab" replace />} />
+      </Routes>
+    );
+  }
+
   const DashboardComponent = role === "receptionist" ? ReceptionistDashboard : role === "doctor" ? DoctorDashboard : AdminDashboard;
 
   return (
     <Routes>
       <Route path="/rx/:prescriptionId" element={<PrescriptionViewer />} />
       <Route path="/dashboard" element={<DashboardComponent />} />
+      <Route path="/dashboard/lab-results" element={
+        role === "doctor" || role === "admin" ? <LabResultsInbox /> : <Navigate to="/dashboard" replace />
+      } />
       <Route path="/dashboard/consultation/:visitId" element={
         role === "doctor" || role === "admin" ? <DoctorConsultationPage /> : <Navigate to="/dashboard" replace />
       } />
