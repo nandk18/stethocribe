@@ -34,9 +34,10 @@ serve(async (req) => {
     if (!profile?.clinic_id) throw new Error("No clinic found for this user")
     if (profile.role !== "admin") throw new Error("Only admins can invite staff")
 
-    const { email, role } = await req.json()
+    const { email, role, lab_id } = await req.json()
     if (!email || !role) throw new Error("Email and role are required")
-    if (!["doctor", "receptionist"].includes(role)) throw new Error("Invalid role")
+    if (!["doctor", "receptionist", "lab"].includes(role)) throw new Error("Invalid role")
+    if (role === "lab" && !lab_id) throw new Error("lab_id is required when inviting a lab user")
 
     const { data: clinic } = await supabaseAdmin
       .from("clinics").select("name").eq("id", profile.clinic_id).single()
@@ -47,12 +48,15 @@ serve(async (req) => {
 
     if (existingUser) {
       // Link existing user to this clinic with assigned role
-      await supabaseAdmin.from("profiles").upsert({
+      const profileUpdate: any = {
         user_id: existingUser.id,
         clinic_id: profile.clinic_id,
         role: role,
-        full_name: existingUser.user_metadata?.full_name || email.split("@")[0]
-      }, { onConflict: "user_id" })
+        full_name: existingUser.user_metadata?.full_name || email.split("@")[0],
+      }
+      if (role === "lab") profileUpdate.lab_id = lab_id
+
+      await supabaseAdmin.from("profiles").upsert(profileUpdate, { onConflict: "user_id" })
 
       await supabaseAdmin.from("user_roles").upsert({
         user_id: existingUser.id, role
@@ -72,34 +76,40 @@ serve(async (req) => {
       }
 
       return new Response(
-        JSON.stringify({ success: true, message: "Existing user added to clinic as " + role }),
+        JSON.stringify({ success: true, message: "Existing user added as " + role }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       )
     }
 
     // New user — send invite
+    const inviteMeta: any = {
+      invited_role: role,
+      invited_clinic_id: profile.clinic_id,
+      invited_clinic_name: clinic?.name || "Clinic",
+      invited_by: profile.full_name || "Admin",
+    }
+    if (role === "lab") inviteMeta.invited_lab_id = lab_id
+
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       email,
       {
         redirectTo: `https://stethocribe.lovable.app/accept-invite`,
-        data: {
-          invited_role: role,
-          invited_clinic_id: profile.clinic_id,
-          invited_clinic_name: clinic?.name || "Clinic",
-          invited_by: profile.full_name || "Admin"
-        }
+        data: inviteMeta,
       }
     )
 
     if (inviteError) throw inviteError
 
     // Pre-create profile so team list shows pending member immediately
-    await supabaseAdmin.from("profiles").upsert({
+    const newProfile: any = {
       user_id: inviteData.user.id,
       clinic_id: profile.clinic_id,
       role: role,
-      full_name: email.split("@")[0]
-    }, { onConflict: "user_id" })
+      full_name: email.split("@")[0],
+    }
+    if (role === "lab") newProfile.lab_id = lab_id
+
+    await supabaseAdmin.from("profiles").upsert(newProfile, { onConflict: "user_id" })
 
     await supabaseAdmin.from("user_roles").upsert({
       user_id: inviteData.user.id, role
