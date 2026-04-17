@@ -90,10 +90,12 @@ serve(async (req) => {
     }
     if (role === "lab") inviteMeta.invited_lab_id = lab_id
 
+    // Use the request's origin so the invite link works in preview, prod, and custom domains
+    const origin = req.headers.get("origin") || "https://stethoscribe.lovable.app"
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       email,
       {
-        redirectTo: `https://stethocribe.lovable.app/accept-invite`,
+        redirectTo: `${origin}/accept-invite`,
         data: inviteMeta,
       }
     )
