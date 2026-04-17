@@ -81,6 +81,45 @@ export type Database = {
           },
         ]
       }
+      clinic_labs: {
+        Row: {
+          added_at: string | null
+          clinic_id: string
+          id: string
+          is_preferred: boolean | null
+          lab_id: string
+        }
+        Insert: {
+          added_at?: string | null
+          clinic_id: string
+          id?: string
+          is_preferred?: boolean | null
+          lab_id: string
+        }
+        Update: {
+          added_at?: string | null
+          clinic_id?: string
+          id?: string
+          is_preferred?: boolean | null
+          lab_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinic_labs_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clinic_labs_lab_id_fkey"
+            columns: ["lab_id"]
+            isOneToOne: false
+            referencedRelation: "labs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clinical_notes: {
         Row: {
           audio_url: string | null
@@ -342,10 +381,12 @@ export type Database = {
       }
       lab_results: {
         Row: {
+          actioned_prescription_id: string | null
           ai_summary: Json | null
           clinic_id: string
           created_at: string | null
           doctor_id: string | null
+          doctor_notes: string | null
           extracted_text: string | null
           file_name: string | null
           file_type: string | null
@@ -359,10 +400,12 @@ export type Database = {
           uploaded_at: string | null
         }
         Insert: {
+          actioned_prescription_id?: string | null
           ai_summary?: Json | null
           clinic_id: string
           created_at?: string | null
           doctor_id?: string | null
+          doctor_notes?: string | null
           extracted_text?: string | null
           file_name?: string | null
           file_type?: string | null
@@ -376,10 +419,12 @@ export type Database = {
           uploaded_at?: string | null
         }
         Update: {
+          actioned_prescription_id?: string | null
           ai_summary?: Json | null
           clinic_id?: string
           created_at?: string | null
           doctor_id?: string | null
+          doctor_notes?: string | null
           extracted_text?: string | null
           file_name?: string | null
           file_type?: string | null
@@ -393,6 +438,13 @@ export type Database = {
           uploaded_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "lab_results_actioned_prescription_id_fkey"
+            columns: ["actioned_prescription_id"]
+            isOneToOne: false
+            referencedRelation: "prescriptions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "lab_results_clinic_id_fkey"
             columns: ["clinic_id"]
@@ -433,35 +485,51 @@ export type Database = {
       labs: {
         Row: {
           address: string | null
-          clinic_id: string
+          clinic_id: string | null
           created_at: string | null
           email: string | null
           id: string
           name: string
           phone: string | null
+          registered_by_clinic_id: string | null
+          type: string
+          verified: boolean
         }
         Insert: {
           address?: string | null
-          clinic_id: string
+          clinic_id?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
           name: string
           phone?: string | null
+          registered_by_clinic_id?: string | null
+          type?: string
+          verified?: boolean
         }
         Update: {
           address?: string | null
-          clinic_id?: string
+          clinic_id?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
           name?: string
           phone?: string | null
+          registered_by_clinic_id?: string | null
+          type?: string
+          verified?: boolean
         }
         Relationships: [
           {
             foreignKeyName: "labs_clinic_id_fkey"
             columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labs_registered_by_clinic_id_fkey"
+            columns: ["registered_by_clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
             referencedColumns: ["id"]
