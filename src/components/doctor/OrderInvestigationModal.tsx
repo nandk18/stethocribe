@@ -190,21 +190,33 @@ export default function OrderInvestigationModal({
           </div>
 
           <div className="space-y-2">
-            <Label>Send to Lab</Label>
+            <Label>Send to Lab <span className="text-destructive">*</span></Label>
             <Select value={selectedLabId} onValueChange={setSelectedLabId}>
-              <SelectTrigger className="rounded-lg"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="rounded-lg">
+                <SelectValue placeholder="Select a lab..." />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="any">Any Lab / Patient's Choice</SelectItem>
-                {labs.map(l => (
+                {labs.filter(l => l.type === "internal").length > 0 && (
+                  <div className="px-2 py-1 text-[10px] uppercase font-semibold text-muted-foreground">Internal Labs</div>
+                )}
+                {labs.filter(l => l.type === "internal").map(l => (
                   <SelectItem key={l.id} value={l.id}>
-                    {l.name} {l.email && <span className="text-muted-foreground">· {l.email}</span>}
+                    🏥 {l.name}{l.email && <span className="text-muted-foreground"> · {l.email}</span>}
+                  </SelectItem>
+                ))}
+                {labs.filter(l => l.type === "external").length > 0 && (
+                  <div className="px-2 py-1 text-[10px] uppercase font-semibold text-muted-foreground">External Labs</div>
+                )}
+                {labs.filter(l => l.type === "external").map(l => (
+                  <SelectItem key={l.id} value={l.id}>
+                    🌐 {l.name}{l.email && <span className="text-muted-foreground"> · {l.email}</span>}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             {labs.length === 0 && (
               <p className="text-xs text-muted-foreground">
-                No labs registered yet. Add labs in Settings → Labs.
+                No labs available yet. Add labs in Settings → Labs (or browse the Lab Directory).
               </p>
             )}
           </div>
@@ -233,7 +245,7 @@ export default function OrderInvestigationModal({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={submitting || !testName.trim()}>
+          <Button onClick={handleSubmit} disabled={submitting || !testName.trim() || !selectedLabId}>
             {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Ordering...</> : "Send Order"}
           </Button>
         </DialogFooter>
