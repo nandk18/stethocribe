@@ -67,6 +67,7 @@ function AppRoutes() {
         <Route path="/accept-invite" element={<AcceptInvite />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/register-lab" element={<LabRegistration />} />
         <Route path="*" element={<Navigate to="/auth" replace />} />
       </Routes>
     );
