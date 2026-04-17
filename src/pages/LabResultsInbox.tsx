@@ -384,6 +384,16 @@ export default function LabResultsInbox() {
           )}
         </SheetContent>
       </Sheet>
+
+      <LabResultActionPanel
+        open={!!actionTarget}
+        onClose={() => setActionTarget(null)}
+        result={actionTarget}
+        doctorId={doctor?.id || null}
+        doctorName={doctor?.name || profile?.full_name || ""}
+        clinicName={clinic?.name || ""}
+        onActioned={() => fetchResults()}
+      />
     </DashboardLayout>
   );
 }
