@@ -146,6 +146,16 @@ export default function LabResultsInbox() {
     navigate(`/dashboard/patients/${result.patient_id}`);
   };
 
+  const handleCancelOrder = async (orderId: string) => {
+    const { error } = await supabase
+      .from("lab_orders")
+      .update({ status: "cancelled" })
+      .eq("id", orderId);
+    if (error) { toast.error("Failed to cancel order"); return; }
+    toast.success("Lab order cancelled");
+    fetchPendingOrders();
+  };
+
   const pendingCount = results.filter(r => r.status === "pending_review").length;
 
   return (
