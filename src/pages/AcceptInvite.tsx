@@ -14,6 +14,7 @@ export default function AcceptInvite() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -25,61 +26,77 @@ export default function AcceptInvite() {
   }>({});
 
   useEffect(() => {
-    // Supabase auto-exchanges the token from the URL hash
-    const handleSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const meta = session.user.user_metadata || {};
-        setInviteInfo({
-          role: meta.invited_role || meta.role || "staff",
-          clinic_name: meta.clinic_name || "your clinic",
-          invited_by: meta.invited_by || "an admin",
-          email: session.user.email,
-        });
-        setFullName(meta.full_name || "");
-        setLoading(false);
-      } else {
-        // Listen for auth state change (token exchange)
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-          async (_event, session) => {
-            if (session?.user) {
-              const meta = session.user.user_metadata || {};
-              setInviteInfo({
-                role: meta.invited_role || meta.role || "staff",
-                clinic_name: meta.clinic_name || "your clinic",
-                invited_by: meta.invited_by || "an admin",
-                email: session.user.email,
-              });
-              setFullName(meta.full_name || "");
-              setLoading(false);
-              subscription.unsubscribe();
-            }
-          }
-        );
-        // Wait a bit, if still no session, show error
-        setTimeout(() => setLoading(false), 5000);
-      }
+    let cancelled = false;
+
+    const applyUser = (user: any) => {
+      const meta = user?.user_metadata || {};
+      setInviteInfo({
+        role: meta.invited_role || meta.role || "staff",
+        clinic_name: meta.invited_clinic_name || meta.clinic_name || "your clinic",
+        invited_by: meta.invited_by || "an admin",
+        email: user?.email,
+      });
+      setFullName(meta.full_name || "");
+      setLoading(false);
     };
-    handleSession();
+
+    const init = async () => {
+      // Try to consume tokens from URL hash (Supabase invite links)
+      const hash = window.location.hash || "";
+      if (hash.includes("access_token")) {
+        const params = new URLSearchParams(hash.replace(/^#/, ""));
+        const access_token = params.get("access_token");
+        const refresh_token = params.get("refresh_token") || "";
+        if (access_token) {
+          const { data, error: setErr } = await supabase.auth.setSession({ access_token, refresh_token });
+          if (!setErr && data.user && !cancelled) {
+            // clean the hash
+            window.history.replaceState({}, document.title, window.location.pathname);
+            applyUser(data.user);
+            return;
+          }
+        }
+      }
+
+      // Fallback: existing session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user && !cancelled) {
+        applyUser(session.user);
+        return;
+      }
+
+      // Listen for late auth state changes
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
+        if (s?.user && !cancelled) {
+          applyUser(s.user);
+          subscription.unsubscribe();
+        }
+      });
+
+      setTimeout(() => {
+        if (!cancelled) {
+          setLoading(false);
+          setError("No invite token found. Please open this page from the link in your invitation email.");
+        }
+      }, 4000);
+    };
+
+    init();
+    return () => { cancelled = true; };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password !== confirmPassword) {
-      toast.error("Passwords do not match");
-      return;
-    }
-    if (password.length < 8) {
-      toast.error("Password must be at least 8 characters");
-      return;
-    }
+    setError(null);
+    if (!fullName.trim()) { setError("Please enter your name"); return; }
+    if (password.length < 8) { setError("Password must be at least 8 characters"); return; }
+    if (password !== confirmPassword) { setError("Passwords do not match"); return; }
 
     setSubmitting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) throw new Error("No active session");
+      if (!session?.user) throw new Error("No active session — please reopen the invite link.");
 
-      // Update password and name
       const { error: updateErr } = await supabase.auth.updateUser({
         password,
         data: { full_name: fullName },
@@ -89,28 +106,24 @@ export default function AcceptInvite() {
       const userId = session.user.id;
       const meta = session.user.user_metadata || {};
       const role = meta.invited_role || meta.role || "admin";
-      const clinicId = meta.invited_clinic_id || meta.clinic_id;
+      const clinicId = meta.invited_clinic_id || meta.clinic_id || null;
       const labId = meta.invited_lab_id || null;
 
-      // Update profile
-      const profileUpdate: any = {
-        full_name: fullName,
-        role,
-        clinic_id: clinicId,
-      };
-      if (role === "lab") profileUpdate.lab_id = labId;
-
+      const profileUpdate: any = { full_name: fullName, role };
+      if (clinicId) profileUpdate.clinic_id = clinicId;
+      if (role === "lab" && labId) profileUpdate.lab_id = labId;
       await supabase.from("profiles").update(profileUpdate).eq("user_id", userId);
 
       setSuccess(true);
       toast.success("Account activated!");
 
-      // Sign out and redirect to login
-      setTimeout(async () => {
-        await supabase.auth.signOut();
-        navigate("/auth");
-      }, 2000);
+      // Stay logged in and route by role
+      setTimeout(() => {
+        if (role === "lab") navigate("/lab");
+        else navigate("/dashboard");
+      }, 1200);
     } catch (err: any) {
+      setError(err.message || "Failed to activate account");
       toast.error(err.message || "Failed to activate account");
     } finally {
       setSubmitting(false);
@@ -133,9 +146,9 @@ export default function AcceptInvite() {
             <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
             <h2 className="text-xl font-bold text-foreground">Account Activated!</h2>
             <p className="text-muted-foreground">
-              You can now login as <Badge variant="secondary" className="capitalize">{inviteInfo.role}</Badge>
+              Welcome <Badge variant="secondary" className="capitalize">{inviteInfo.role}</Badge>
             </p>
-            <p className="text-sm text-muted-foreground">Redirecting to login...</p>
+            <p className="text-sm text-muted-foreground">Taking you to your dashboard…</p>
           </CardContent>
         </Card>
       </div>
@@ -148,7 +161,7 @@ export default function AcceptInvite() {
         <Card className="w-full max-w-md text-center shadow-elevated">
           <CardContent className="py-10 space-y-4">
             <h2 className="text-xl font-bold text-foreground">Invalid or Expired Link</h2>
-            <p className="text-muted-foreground">This invitation link may have expired or already been used.</p>
+            <p className="text-muted-foreground">{error || "This invitation link may have expired or already been used."}</p>
             <Button onClick={() => navigate("/auth")}>Go to Login</Button>
           </CardContent>
         </Card>
@@ -168,7 +181,7 @@ export default function AcceptInvite() {
 
         <Card className="shadow-elevated">
           <CardHeader>
-            <CardTitle>Activate Your Account</CardTitle>
+            <CardTitle>Set Your Password</CardTitle>
             <CardDescription className="space-y-1">
               <span className="block">
                 You've been invited to join <strong>{inviteInfo.clinic_name}</strong> as a{" "}
@@ -187,40 +200,24 @@ export default function AcceptInvite() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="full-name">Full Name</Label>
-                <Input
-                  id="full-name"
-                  placeholder="Dr. John Smith"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required
-                />
+                <Input id="full-name" placeholder="Dr. John Smith" value={fullName}
+                  onChange={(e) => setFullName(e.target.value)} required />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Min 8 characters"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={8}
-                />
+                <Label htmlFor="password">Set Password</Label>
+                <Input id="password" type="password" placeholder="Min 8 characters"
+                  value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirm-password">Confirm Password</Label>
-                <Input
-                  id="confirm-password"
-                  type="password"
-                  placeholder="Re-enter password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  minLength={8}
-                />
+                <Input id="confirm-password" type="password" placeholder="Re-enter password"
+                  value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={8} />
               </div>
+
+              {error && <p className="text-sm text-destructive">{error}</p>}
+
               <Button type="submit" className="w-full" disabled={submitting}>
-                {submitting ? "Activating..." : "Activate Account"}
+                {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Activating...</> : "Complete Setup & Login"}
               </Button>
             </form>
           </CardContent>

@@ -23,6 +23,7 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import AppointmentsPage from "./pages/AppointmentsPage";
 import LabDashboard from "./pages/LabDashboard";
 import LabResultsInbox from "./pages/LabResultsInbox";
+import LabRegistration from "./pages/LabRegistration";
 import NotFound from "./pages/NotFound";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -66,6 +67,7 @@ function AppRoutes() {
         <Route path="/accept-invite" element={<AcceptInvite />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/register-lab" element={<LabRegistration />} />
         <Route path="*" element={<Navigate to="/auth" replace />} />
       </Routes>
     );

@@ -10,6 +10,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { FlaskConical, FileText, AlertCircle, ExternalLink, Loader2, ArrowRight, MessageCircle } from "lucide-react";
+import LabResultActionPanel from "@/components/doctor/LabResultActionPanel";
+import { useClinic } from "@/hooks/useClinic";
 
 type LabResult = {
   id: string;
@@ -21,8 +23,8 @@ type LabResult = {
   uploaded_at: string;
   reviewed_at: string | null;
   patient_id: string;
-  patient: { name: string; healthcare_id: string | null; phone: string | null } | null;
-  order: { test_name: string; test_category: string | null } | null;
+  patient: { name: string; healthcare_id: string | null; phone: string | null; email: string | null } | null;
+  order: { test_name: string; test_category: string | null; visit_id: string | null } | null;
   lab: { name: string } | null;
 };
 
@@ -49,12 +51,14 @@ type PendingOrder = {
 
 export default function LabResultsInbox() {
   const { profile } = useAuth();
+  const { clinic, doctor } = useClinic();
   const navigate = useNavigate();
   const [tab, setTab] = useState<"pending_orders" | "pending_review" | "reviewed" | "all">("pending_orders");
   const [results, setResults] = useState<LabResult[]>([]);
   const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<LabResult | null>(null);
+  const [actionTarget, setActionTarget] = useState<LabResult | null>(null);
 
   const fetchResults = async () => {
     if (!profile?.clinic_id) return;
@@ -63,8 +67,8 @@ export default function LabResultsInbox() {
       .from("lab_results")
       .select(`
         id, file_url, file_name, file_type, ai_summary, status, uploaded_at, reviewed_at, patient_id,
-        patients(name, healthcare_id, phone),
-        lab_orders(test_name, test_category),
+        patients(name, healthcare_id, phone, email),
+        lab_orders(test_name, test_category, visit_id),
         labs(name)
       `)
       .eq("clinic_id", profile.clinic_id)
@@ -143,7 +147,7 @@ export default function LabResultsInbox() {
   };
 
   const handleActOnResult = (result: LabResult) => {
-    navigate(`/dashboard/patients/${result.patient_id}`);
+    setActionTarget(result);
   };
 
   const handleCancelOrder = async (orderId: string) => {
@@ -380,6 +384,16 @@ export default function LabResultsInbox() {
           )}
         </SheetContent>
       </Sheet>
+
+      <LabResultActionPanel
+        open={!!actionTarget}
+        onClose={() => setActionTarget(null)}
+        result={actionTarget}
+        doctorId={doctor?.id || null}
+        doctorName={doctor?.name || profile?.full_name || ""}
+        clinicName={clinic?.name || ""}
+        onActioned={() => fetchResults()}
+      />
     </DashboardLayout>
   );
 }

@@ -39,10 +39,10 @@ export default function OrderInvestigationModal({
   open, onClose, clinicId, visitId, patientId, patientName,
   doctorId, doctorName, clinicName, onOrdered,
 }: Props) {
-  const [labs, setLabs] = useState<Lab[]>([]);
+  const [labs, setLabs] = useState<(Lab & { type?: string })[]>([]);
   const [testName, setTestName] = useState("");
   const [testCategory, setTestCategory] = useState("Blood Test");
-  const [selectedLabId, setSelectedLabId] = useState<string>("any");
+  const [selectedLabId, setSelectedLabId] = useState<string>("");
   const [urgency, setUrgency] = useState<"routine" | "urgent" | "stat">("routine");
   const [clinicalNotes, setClinicalNotes] = useState("");
   const [sendNotification, setSendNotification] = useState(true);
@@ -50,12 +50,29 @@ export default function OrderInvestigationModal({
 
   useEffect(() => {
     if (!open || !clinicId) return;
-    supabase.from("labs").select("id, name, email").eq("clinic_id", clinicId).order("name")
-      .then(({ data }) => setLabs(data || []));
+    (async () => {
+      // Internal labs owned by this clinic
+      const { data: internal } = await supabase
+        .from("labs")
+        .select("id, name, email, type")
+        .eq("clinic_id", clinicId)
+        .eq("type", "internal");
+      // External labs this clinic has linked
+      const { data: links } = await supabase
+        .from("clinic_labs")
+        .select("labs(id, name, email, type)")
+        .eq("clinic_id", clinicId);
+      const external = (links || []).map((l: any) => l.labs).filter(Boolean);
+      const merged = [
+        ...(internal || []).map((l: any) => ({ ...l, type: "internal" })),
+        ...external.map((l: any) => ({ ...l, type: "external" })),
+      ];
+      setLabs(merged);
+    })();
   }, [open, clinicId]);
 
   const reset = () => {
-    setTestName(""); setTestCategory("Blood Test"); setSelectedLabId("any");
+    setTestName(""); setTestCategory("Blood Test"); setSelectedLabId("");
     setUrgency("routine"); setClinicalNotes(""); setSendNotification(true);
   };
 
@@ -63,6 +80,8 @@ export default function OrderInvestigationModal({
 
   const handleSubmit = async () => {
     if (!testName.trim()) { toast.error("Please enter a test name"); return; }
+    if (!selectedLabId) { toast.error("Please select a lab before ordering"); return; }
+    if (!testCategory) { toast.error("Please select a test category"); return; }
     setSubmitting(true);
     try {
       const { data: order, error } = await supabase
@@ -171,21 +190,33 @@ export default function OrderInvestigationModal({
           </div>
 
           <div className="space-y-2">
-            <Label>Send to Lab</Label>
+            <Label>Send to Lab <span className="text-destructive">*</span></Label>
             <Select value={selectedLabId} onValueChange={setSelectedLabId}>
-              <SelectTrigger className="rounded-lg"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="rounded-lg">
+                <SelectValue placeholder="Select a lab..." />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="any">Any Lab / Patient's Choice</SelectItem>
-                {labs.map(l => (
+                {labs.filter(l => l.type === "internal").length > 0 && (
+                  <div className="px-2 py-1 text-[10px] uppercase font-semibold text-muted-foreground">Internal Labs</div>
+                )}
+                {labs.filter(l => l.type === "internal").map(l => (
                   <SelectItem key={l.id} value={l.id}>
-                    {l.name} {l.email && <span className="text-muted-foreground">· {l.email}</span>}
+                    🏥 {l.name}{l.email && <span className="text-muted-foreground"> · {l.email}</span>}
+                  </SelectItem>
+                ))}
+                {labs.filter(l => l.type === "external").length > 0 && (
+                  <div className="px-2 py-1 text-[10px] uppercase font-semibold text-muted-foreground">External Labs</div>
+                )}
+                {labs.filter(l => l.type === "external").map(l => (
+                  <SelectItem key={l.id} value={l.id}>
+                    🌐 {l.name}{l.email && <span className="text-muted-foreground"> · {l.email}</span>}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             {labs.length === 0 && (
               <p className="text-xs text-muted-foreground">
-                No labs registered yet. Add labs in Settings → Labs.
+                No labs available yet. Add labs in Settings → Labs (or browse the Lab Directory).
               </p>
             )}
           </div>
@@ -214,7 +245,7 @@ export default function OrderInvestigationModal({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={submitting || !testName.trim()}>
+          <Button onClick={handleSubmit} disabled={submitting || !testName.trim() || !selectedLabId}>
             {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Ordering...</> : "Send Order"}
           </Button>
         </DialogFooter>
