@@ -90,7 +90,69 @@ export default function PatientHistory({ patientId, currentVisitId }: Props) {
     );
   }
 
-  if (history.length === 0) {
+  const renderLabOrdersSection = () => {
+    if (labOrders.length === 0) return null;
+    return (
+      <Card className="shadow-card">
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <FlaskConical className="h-4 w-4 text-primary" />
+            <h3 className="font-display text-sm font-semibold text-foreground">Lab Orders</h3>
+            <Badge variant="outline" className="text-[10px]">{labOrders.length}</Badge>
+          </div>
+          <div className="space-y-2">
+            {labOrders.map(order => {
+              const result = order.lab_results?.[0];
+              const summary = result?.ai_summary as any;
+              const status = summary?.overall_status;
+              const statusClass =
+                status === "critical" ? "bg-destructive/10 text-destructive border-destructive/30" :
+                status === "abnormal" ? "bg-orange-500/10 text-orange-600 border-orange-500/30" :
+                status === "borderline" ? "bg-yellow-500/10 text-yellow-700 border-yellow-500/30" :
+                status === "normal" ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/30" :
+                "bg-muted text-muted-foreground border-border";
+              return (
+                <div key={order.id} className="rounded-lg border border-border p-2.5 space-y-1">
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium text-foreground">{order.test_name}</span>
+                        {order.test_category && <Badge variant="outline" className="text-[10px]">{order.test_category}</Badge>}
+                        {order.urgency && order.urgency !== "routine" && (
+                          <Badge variant="outline" className="text-[10px] border-warning/30 bg-warning/10 text-warning uppercase">{order.urgency}</Badge>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {order.labs?.name || "Any Lab"}
+                        {order.ordered_at && ` · ${new Date(order.ordered_at).toLocaleDateString()}`}
+                      </p>
+                    </div>
+                    {result ? (
+                      <Badge variant="outline" className={`text-[10px] ${statusClass}`}>
+                        {summary?.urgent && <AlertTriangle className="mr-0.5 h-2.5 w-2.5" />}
+                        {status || "result ready"}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] bg-yellow-500/10 text-yellow-700 border-yellow-500/30">
+                        {order.status || "pending"}
+                      </Badge>
+                    )}
+                  </div>
+                  {summary?.one_line_summary && (
+                    <p className="text-xs text-foreground/80 bg-muted/50 rounded p-2">
+                      🤖 {summary.one_line_summary}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  if (history.length === 0 && labOrders.length === 0) {
     return (
       <Card className="shadow-card">
         <CardContent className="flex flex-col items-center justify-center py-16">
@@ -105,7 +167,10 @@ export default function PatientHistory({ patientId, currentVisitId }: Props) {
   return (
     <div className="space-y-3">
       <VitalsTrends patientId={patientId} />
-      <p className="text-sm text-muted-foreground">{history.length} previous visit{history.length !== 1 ? "s" : ""}</p>
+      {renderLabOrdersSection()}
+      {history.length > 0 && (
+        <p className="text-sm text-muted-foreground">{history.length} previous visit{history.length !== 1 ? "s" : ""}</p>
+      )}
       {history.map(visit => {
         const soap = visit.clinical_notes?.[0]?.soap_notes;
         const meds = visit.prescriptions?.[0]?.medications;
