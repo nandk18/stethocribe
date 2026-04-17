@@ -34,55 +34,16 @@ serve(async (req) => {
       throw new Error("lab_order_id and lab_email are required");
     }
 
-    // Try Lovable transactional email if available
-    let emailSent = false;
-    let emailError: string | null = null;
-
-    try {
-      const { error: invokeErr } = await supabaseAdmin.functions.invoke(
-        "send-transactional-email",
-        {
-          body: {
-            templateName: "lab-order-notification",
-            recipientEmail: lab_email,
-            idempotencyKey: `lab-order-${lab_order_id}`,
-            templateData: {
-              patient_name,
-              test_name,
-              urgency,
-              clinical_notes,
-              doctor_name,
-              clinic_name,
-            },
-          },
-        }
-      );
-      if (invokeErr) {
-        emailError = invokeErr.message || String(invokeErr);
-      } else {
-        emailSent = true;
-      }
-    } catch (e: any) {
-      emailError = e?.message || String(e);
-    }
-
-    // Log the notification attempt (best-effort, won't block)
-    console.log("Lab order notification:", {
-      lab_order_id,
-      lab_email,
-      test_name,
-      urgency,
-      emailSent,
-      emailError,
+    // Email notifications disabled for now — lab sees orders in their dashboard.
+    console.log("Lab order received (in-app only):", {
+      lab_order_id, lab_email, test_name, urgency,
     });
 
     return new Response(
       JSON.stringify({
         success: true,
-        email_sent: emailSent,
-        note: emailSent
-          ? "Lab notified by email."
-          : "Order saved. Email not configured yet — lab will see it in their dashboard.",
+        email_sent: false,
+        note: "Order delivered to lab dashboard.",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
