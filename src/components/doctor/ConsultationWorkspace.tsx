@@ -17,7 +17,9 @@ import PrescriptionShareModal from "@/components/doctor/PrescriptionShareModal";
 import DocumentsTab from "@/components/doctor/DocumentsTab";
 import TemplateSelector from "@/components/doctor/TemplateSelector";
 import EMRExportButtons from "@/components/doctor/EMRExportButtons";
+import OrderInvestigationModal from "@/components/doctor/OrderInvestigationModal";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { FlaskConical } from "lucide-react";
 
 type Visit = {
   id: string;
@@ -125,6 +127,9 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
   const [shareOpen, setShareOpen] = useState(false);
   const [sharePdfUrl, setSharePdfUrl] = useState<string | null>(null);
   const [sharePrescriptionId, setSharePrescriptionId] = useState<string | null>(null);
+
+  // Lab order modal
+  const [orderLabOpen, setOrderLabOpen] = useState(false);
 
   const getAge = (dob: string | null) => {
     if (!dob) return "N/A";
@@ -455,6 +460,20 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
         </div>
       )}
 
+      {profile?.clinic_id && doctor && visit.patient && (
+        <OrderInvestigationModal
+          open={orderLabOpen}
+          onClose={() => setOrderLabOpen(false)}
+          clinicId={profile.clinic_id}
+          visitId={visit.id}
+          patientId={visit.patient.id}
+          patientName={visit.patient.name}
+          doctorId={doctor.id}
+          doctorName={doctor.name || "Doctor"}
+          clinicName={clinic?.name || "Clinic"}
+        />
+      )}
+
       <PrescriptionShareModal
         open={shareOpen}
         onClose={() => { setShareOpen(false); onComplete(); }}
@@ -593,7 +612,22 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
             <Button variant="outline" size="sm" onClick={addMedRow} className="mt-2 rounded-lg">+ Add Medication</Button>
           </div>
 
-          <div className="space-y-2"><Label className="font-semibold">Investigations</Label><Input value={investigations} onChange={e => setInvestigations(e.target.value)} placeholder="CBC, LFT, ECG..." className="rounded-lg" /></div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="font-semibold">Investigations</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setOrderLabOpen(true)}
+                className="rounded-lg h-8 text-xs"
+              >
+                <FlaskConical className="mr-1.5 h-3.5 w-3.5" /> Order to Lab
+              </Button>
+            </div>
+            <Input value={investigations} onChange={e => setInvestigations(e.target.value)} placeholder="CBC, LFT, ECG..." className="rounded-lg" />
+            <p className="text-xs text-muted-foreground">Tests listed here appear on the prescription. Use "Order to Lab" to send a structured order to a registered lab.</p>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2"><Label className="font-semibold">Follow-up Date</Label><Input type="date" value={followUpDate} onChange={e => setFollowUpDate(e.target.value)} className="rounded-lg" /></div>
             <div className="space-y-2"><Label className="font-semibold">Notes</Label><Input value={prescriptionNotes} onChange={e => setPrescriptionNotes(e.target.value)} placeholder="Additional notes..." className="rounded-lg" /></div>
