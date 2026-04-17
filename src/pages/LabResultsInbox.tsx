@@ -10,6 +10,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { FlaskConical, FileText, AlertCircle, ExternalLink, Loader2, ArrowRight, MessageCircle } from "lucide-react";
+import LabResultActionPanel from "@/components/doctor/LabResultActionPanel";
+import { useClinic } from "@/hooks/useClinic";
 
 type LabResult = {
   id: string;
