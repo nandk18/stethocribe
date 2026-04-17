@@ -162,6 +162,20 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visit.id]);
 
+  const handleCancelLabOrder = async (orderId: string, testName: string) => {
+    if (!confirm(`Cancel the lab order for "${testName}"? The lab will no longer see it as pending.`)) return;
+    const { error } = await supabase
+      .from("lab_orders")
+      .update({ status: "cancelled" })
+      .eq("id", orderId);
+    if (error) {
+      toast.error(error.message || "Failed to cancel order");
+      return;
+    }
+    toast.success("Lab order cancelled");
+    fetchVisitLabOrders();
+  };
+
   const getAge = (dob: string | null) => {
     if (!dob) return "N/A";
     return Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
@@ -683,6 +697,15 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 capitalize">
                           {o.status || "ordered"}
                         </Badge>
+                        {(o.status === "ordered" || !o.status) && (
+                          <button
+                            type="button"
+                            onClick={() => handleCancelLabOrder(o.id, o.test_name)}
+                            className="text-[10px] font-medium text-destructive/80 hover:text-destructive hover:underline ml-0.5"
+                          >
+                            Cancel
+                          </button>
+                        )}
                       </div>
                     </li>
                   ))}
