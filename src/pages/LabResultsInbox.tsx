@@ -36,11 +36,23 @@ const statusBadgeClass = (status?: string) => {
   }
 };
 
+type PendingOrder = {
+  id: string;
+  test_name: string;
+  test_category: string | null;
+  urgency: string | null;
+  status: string | null;
+  ordered_at: string | null;
+  patient: { name: string; healthcare_id: string | null } | null;
+  lab: { name: string } | null;
+};
+
 export default function LabResultsInbox() {
   const { profile } = useAuth();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"all" | "pending_review" | "reviewed">("pending_review");
+  const [tab, setTab] = useState<"pending_orders" | "pending_review" | "reviewed" | "all">("pending_orders");
   const [results, setResults] = useState<LabResult[]>([]);
+  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<LabResult | null>(null);
 
@@ -58,7 +70,7 @@ export default function LabResultsInbox() {
       .eq("clinic_id", profile.clinic_id)
       .order("uploaded_at", { ascending: false });
 
-    if (tab !== "all") query = query.eq("status", tab);
+    if (tab === "pending_review" || tab === "reviewed") query = query.eq("status", tab);
 
     const { data, error } = await query;
     if (!error && data) {
@@ -72,7 +84,29 @@ export default function LabResultsInbox() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchResults(); }, [profile, tab]);
+  const fetchPendingOrders = async () => {
+    if (!profile?.clinic_id) return;
+    const { data } = await supabase
+      .from("lab_orders")
+      .select("id, test_name, test_category, urgency, status, ordered_at, patients(name, healthcare_id), labs(name)")
+      .eq("clinic_id", profile.clinic_id)
+      .eq("status", "ordered")
+      .order("ordered_at", { ascending: false });
+    setPendingOrders((data || []).map((o: any) => ({
+      ...o,
+      patient: Array.isArray(o.patients) ? o.patients[0] : o.patients,
+      lab: Array.isArray(o.labs) ? o.labs[0] : o.labs,
+    })));
+  };
+
+  useEffect(() => {
+    if (tab === "pending_orders") {
+      fetchPendingOrders();
+      setLoading(false);
+    } else {
+      fetchResults();
+    }
+  }, [profile, tab]);
 
   // Realtime
   useEffect(() => {
@@ -80,7 +114,10 @@ export default function LabResultsInbox() {
     const channel = supabase.channel("lab-results-" + profile.clinic_id)
       .on("postgres_changes",
         { event: "*", schema: "public", table: "lab_results", filter: `clinic_id=eq.${profile.clinic_id}` },
-        () => fetchResults())
+        () => { fetchResults(); fetchPendingOrders(); })
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "lab_orders", filter: `clinic_id=eq.${profile.clinic_id}` },
+        () => fetchPendingOrders())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [profile?.clinic_id, tab]);
