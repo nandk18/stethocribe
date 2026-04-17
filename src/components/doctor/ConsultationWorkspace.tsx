@@ -131,6 +131,37 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
   // Lab order modal
   const [orderLabOpen, setOrderLabOpen] = useState(false);
 
+  // Lab orders already placed during this visit
+  type VisitLabOrder = {
+    id: string; test_name: string; test_category: string | null;
+    urgency: string | null; status: string | null; ordered_at: string | null;
+    lab_id: string | null; lab?: { name: string } | null;
+  };
+  const [visitLabOrders, setVisitLabOrders] = useState<VisitLabOrder[]>([]);
+
+  const fetchVisitLabOrders = async () => {
+    const { data } = await supabase
+      .from("lab_orders")
+      .select("id, test_name, test_category, urgency, status, ordered_at, lab_id, lab:labs(name)")
+      .eq("visit_id", visit.id)
+      .order("ordered_at", { ascending: false });
+    setVisitLabOrders((data as any) || []);
+  };
+
+  useEffect(() => {
+    if (!visit.id) return;
+    fetchVisitLabOrders();
+    const channel = supabase
+      .channel(`visit-lab-orders-${visit.id}`)
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "lab_orders", filter: `visit_id=eq.${visit.id}` },
+        () => fetchVisitLabOrders()
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visit.id]);
+
   const getAge = (dob: string | null) => {
     if (!dob) return "N/A";
     return Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
@@ -471,6 +502,7 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
           doctorId={doctor.id}
           doctorName={doctor.name || "Doctor"}
           clinicName={clinic?.name || "Clinic"}
+          onOrdered={fetchVisitLabOrders}
         />
       )}
 
@@ -627,6 +659,36 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
             </div>
             <Input value={investigations} onChange={e => setInvestigations(e.target.value)} placeholder="CBC, LFT, ECG..." className="rounded-lg" />
             <p className="text-xs text-muted-foreground">Tests listed here appear on the prescription. Use "Order to Lab" to send a structured order to a registered lab.</p>
+
+            {visitLabOrders.length > 0 && (
+              <div className="mt-3 rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                  <FlaskConical className="h-3.5 w-3.5 text-primary" />
+                  Lab orders placed this visit ({visitLabOrders.length})
+                </div>
+                <ul className="space-y-1.5">
+                  {visitLabOrders.map(o => (
+                    <li key={o.id} className="flex items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-medium text-foreground truncate">{o.test_name}</span>
+                        {o.test_category && <span className="text-muted-foreground">· {o.test_category}</span>}
+                        {o.lab?.name && <span className="text-muted-foreground truncate">→ {o.lab.name}</span>}
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {o.urgency && o.urgency !== "routine" && (
+                          <Badge variant={o.urgency === "stat" ? "destructive" : "secondary"} className="text-[10px] px-1.5 py-0 h-4 uppercase">
+                            {o.urgency}
+                          </Badge>
+                        )}
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 capitalize">
+                          {o.status || "ordered"}
+                        </Badge>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2"><Label className="font-semibold">Follow-up Date</Label><Input type="date" value={followUpDate} onChange={e => setFollowUpDate(e.target.value)} className="rounded-lg" /></div>
