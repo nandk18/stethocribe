@@ -131,6 +131,37 @@ export default function ConsultationWorkspace({ visit, onComplete }: { visit: Vi
   // Lab order modal
   const [orderLabOpen, setOrderLabOpen] = useState(false);
 
+  // Lab orders already placed during this visit
+  type VisitLabOrder = {
+    id: string; test_name: string; test_category: string | null;
+    urgency: string | null; status: string | null; ordered_at: string | null;
+    lab_id: string | null; lab?: { name: string } | null;
+  };
+  const [visitLabOrders, setVisitLabOrders] = useState<VisitLabOrder[]>([]);
+
+  const fetchVisitLabOrders = async () => {
+    const { data } = await supabase
+      .from("lab_orders")
+      .select("id, test_name, test_category, urgency, status, ordered_at, lab_id, lab:labs(name)")
+      .eq("visit_id", visit.id)
+      .order("ordered_at", { ascending: false });
+    setVisitLabOrders((data as any) || []);
+  };
+
+  useEffect(() => {
+    if (!visit.id) return;
+    fetchVisitLabOrders();
+    const channel = supabase
+      .channel(`visit-lab-orders-${visit.id}`)
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "lab_orders", filter: `visit_id=eq.${visit.id}` },
+        () => fetchVisitLabOrders()
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visit.id]);
+
   const getAge = (dob: string | null) => {
     if (!dob) return "N/A";
     return Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
