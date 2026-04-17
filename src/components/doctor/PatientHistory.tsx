@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Calendar, ChevronDown, FileText, Pill, ExternalLink } from "lucide-react";
+import { Calendar, ChevronDown, FileText, Pill, ExternalLink, FlaskConical, AlertTriangle } from "lucide-react";
 import VitalsTrends from "@/components/vitals/VitalsTrends";
 import { renderClinicalNotes } from "@/lib/templateFields";
 
@@ -24,30 +24,57 @@ type HistoryVisit = {
   prescriptions: { id: string; medications: any; investigations: any; follow_up_date: string | null; pdf_url: string | null }[];
 };
 
+type LabOrder = {
+  id: string;
+  test_name: string;
+  test_category: string | null;
+  status: string | null;
+  urgency: string | null;
+  ordered_at: string | null;
+  labs: { name: string } | null;
+  lab_results: { id: string; ai_summary: any; status: string | null; uploaded_at: string | null }[];
+};
+
 export default function PatientHistory({ patientId, currentVisitId }: Props) {
   const [history, setHistory] = useState<HistoryVisit[]>([]);
+  const [labOrders, setLabOrders] = useState<LabOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchHistory = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("visits")
-        .select(`
-          id, visit_date, token_number, chief_complaint, status,
-          doctors(name, qualification),
-          clinical_notes(soap_notes, raw_transcript),
-          prescriptions(id, medications, investigations, follow_up_date, pdf_url)
-        `)
-        .eq("patient_id", patientId)
-        .neq("id", currentVisitId)
-        .order("visit_date", { ascending: false })
-        .limit(20);
+      const [historyRes, labRes] = await Promise.all([
+        supabase
+          .from("visits")
+          .select(`
+            id, visit_date, token_number, chief_complaint, status,
+            doctors(name, qualification),
+            clinical_notes(soap_notes, raw_transcript),
+            prescriptions(id, medications, investigations, follow_up_date, pdf_url)
+          `)
+          .eq("patient_id", patientId)
+          .neq("id", currentVisitId)
+          .order("visit_date", { ascending: false })
+          .limit(20),
+        supabase
+          .from("lab_orders")
+          .select("id, test_name, test_category, status, urgency, ordered_at, labs(name), lab_results(id, ai_summary, status, uploaded_at)")
+          .eq("patient_id", patientId)
+          .order("ordered_at", { ascending: false })
+          .limit(20),
+      ]);
 
-      if (!error && data) {
-        setHistory(data.map((v: any) => ({
+      if (!historyRes.error && historyRes.data) {
+        setHistory(historyRes.data.map((v: any) => ({
           ...v,
           doctors: Array.isArray(v.doctors) ? v.doctors[0] ?? null : v.doctors,
+        })));
+      }
+      if (!labRes.error && labRes.data) {
+        setLabOrders(labRes.data.map((o: any) => ({
+          ...o,
+          labs: Array.isArray(o.labs) ? o.labs[0] ?? null : o.labs,
+          lab_results: o.lab_results || [],
         })));
       }
       setLoading(false);
