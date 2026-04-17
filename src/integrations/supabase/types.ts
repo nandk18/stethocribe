@@ -256,6 +256,218 @@ export type Database = {
           },
         ]
       }
+      lab_orders: {
+        Row: {
+          clinic_id: string
+          clinical_notes: string | null
+          created_at: string | null
+          doctor_id: string | null
+          id: string
+          lab_id: string | null
+          ordered_at: string | null
+          patient_id: string
+          status: string | null
+          test_category: string | null
+          test_name: string
+          urgency: string | null
+          visit_id: string | null
+        }
+        Insert: {
+          clinic_id: string
+          clinical_notes?: string | null
+          created_at?: string | null
+          doctor_id?: string | null
+          id?: string
+          lab_id?: string | null
+          ordered_at?: string | null
+          patient_id: string
+          status?: string | null
+          test_category?: string | null
+          test_name: string
+          urgency?: string | null
+          visit_id?: string | null
+        }
+        Update: {
+          clinic_id?: string
+          clinical_notes?: string | null
+          created_at?: string | null
+          doctor_id?: string | null
+          id?: string
+          lab_id?: string | null
+          ordered_at?: string | null
+          patient_id?: string
+          status?: string | null
+          test_category?: string | null
+          test_name?: string
+          urgency?: string | null
+          visit_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lab_orders_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lab_orders_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "doctors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lab_orders_lab_id_fkey"
+            columns: ["lab_id"]
+            isOneToOne: false
+            referencedRelation: "labs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lab_orders_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lab_orders_visit_id_fkey"
+            columns: ["visit_id"]
+            isOneToOne: false
+            referencedRelation: "visits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lab_results: {
+        Row: {
+          ai_summary: Json | null
+          clinic_id: string
+          created_at: string | null
+          doctor_id: string | null
+          extracted_text: string | null
+          file_name: string | null
+          file_type: string | null
+          file_url: string | null
+          id: string
+          lab_id: string | null
+          lab_order_id: string
+          patient_id: string
+          reviewed_at: string | null
+          status: string | null
+          uploaded_at: string | null
+        }
+        Insert: {
+          ai_summary?: Json | null
+          clinic_id: string
+          created_at?: string | null
+          doctor_id?: string | null
+          extracted_text?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          lab_id?: string | null
+          lab_order_id: string
+          patient_id: string
+          reviewed_at?: string | null
+          status?: string | null
+          uploaded_at?: string | null
+        }
+        Update: {
+          ai_summary?: Json | null
+          clinic_id?: string
+          created_at?: string | null
+          doctor_id?: string | null
+          extracted_text?: string | null
+          file_name?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          lab_id?: string | null
+          lab_order_id?: string
+          patient_id?: string
+          reviewed_at?: string | null
+          status?: string | null
+          uploaded_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lab_results_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lab_results_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "doctors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lab_results_lab_id_fkey"
+            columns: ["lab_id"]
+            isOneToOne: false
+            referencedRelation: "labs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lab_results_lab_order_id_fkey"
+            columns: ["lab_order_id"]
+            isOneToOne: false
+            referencedRelation: "lab_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lab_results_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      labs: {
+        Row: {
+          address: string | null
+          clinic_id: string
+          created_at: string | null
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+        }
+        Insert: {
+          address?: string | null
+          clinic_id: string
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+        }
+        Update: {
+          address?: string | null
+          clinic_id?: string
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "labs_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       note_templates: {
         Row: {
           clinic_id: string | null
@@ -471,6 +683,7 @@ export type Database = {
           created_at: string | null
           full_name: string | null
           id: string
+          lab_id: string | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
@@ -479,6 +692,7 @@ export type Database = {
           created_at?: string | null
           full_name?: string | null
           id?: string
+          lab_id?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
@@ -487,6 +701,7 @@ export type Database = {
           created_at?: string | null
           full_name?: string | null
           id?: string
+          lab_id?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
@@ -496,6 +711,13 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_lab_id_fkey"
+            columns: ["lab_id"]
+            isOneToOne: false
+            referencedRelation: "labs"
             referencedColumns: ["id"]
           },
         ]
@@ -605,7 +827,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "doctor" | "receptionist"
+      app_role: "admin" | "doctor" | "receptionist" | "lab"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -733,7 +955,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "doctor", "receptionist"],
+      app_role: ["admin", "doctor", "receptionist", "lab"],
     },
   },
 } as const
