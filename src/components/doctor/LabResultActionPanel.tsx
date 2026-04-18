@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { FlaskConical, Loader2, Send, ExternalLink, Plus, Trash2, Mic, MicOff, CheckCircle2, ArrowRight } from "lucide-react";
 import PrescriptionShareModal from "@/components/doctor/PrescriptionShareModal";
+import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 
 type Medication = {
   name: string; dosage: string;
@@ -62,11 +63,10 @@ export default function LabResultActionPanel({ open, onClose, result, doctorId, 
   const [prescriptionId, setPrescriptionId] = useState<string | null>(null);
   const [prescriptionPdfUrl, setPrescriptionPdfUrl] = useState<string | null>(null);
 
-  // Voice recording
-  const [isRecording, setIsRecording] = useState(false);
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  // Voice recording (shared hook)
+  const { isRecording, isTranscribing, toggleRecording } = useVoiceRecorder((transcript) =>
+    setDoctorNotes((prev) => (prev ? prev + "\n" + transcript : transcript))
+  );
 
   const isActioned = result?.status === "actioned";
 
@@ -78,8 +78,6 @@ export default function LabResultActionPanel({ open, onClose, result, doctorId, 
       setShowShare(false);
       setPrescriptionId(null);
       setPrescriptionPdfUrl(null);
-      setIsRecording(false);
-      setIsTranscribing(false);
     }
   }, [open, result?.id]);
 
@@ -93,48 +91,6 @@ export default function LabResultActionPanel({ open, onClose, result, doctorId, 
     setMedications(prev => prev.map((m, i) => i === idx ? { ...m, ...patch } : m));
   const addMed = () => setMedications(prev => [...prev, emptyMed()]);
   const removeMed = (idx: number) => setMedications(prev => prev.filter((_, i) => i !== idx));
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      chunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-
-      mediaRecorder.onstop = async () => {
-        stream.getTracks().forEach(t => t.stop());
-        const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
-        setIsTranscribing(true);
-        try {
-          const formData = new FormData();
-          formData.append("audio", audioBlob, "recording.webm");
-          const { data, error } = await supabase.functions.invoke("transcribe-audio", { body: formData });
-          if (error) throw error;
-          if (data?.transcript) {
-            setDoctorNotes(prev => prev ? prev + "\n" + data.transcript : data.transcript);
-          }
-        } catch (err: any) {
-          toast.error("Transcription failed: " + (err.message || "Unknown error"));
-        } finally {
-          setIsTranscribing(false);
-        }
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-    } catch {
-      toast.error("Microphone access denied");
-    }
-  };
-
-  const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
-    setIsRecording(false);
-  };
 
   const handleGenerate = async () => {
     if (!result || !doctorId) return;
@@ -272,7 +228,7 @@ export default function LabResultActionPanel({ open, onClose, result, doctorId, 
                     <Button
                       type="button"
                       size="sm"
-                      onClick={isRecording ? stopRecording : startRecording}
+                      onClick={toggleRecording}
                       disabled={isTranscribing}
                       className={`rounded-full text-xs h-8 ${
                         isRecording ? "bg-destructive hover:bg-destructive/90 animate-pulse" : ""

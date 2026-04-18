@@ -53,7 +53,7 @@ export default function LabResultsInbox() {
   const { profile } = useAuth();
   const { clinic, doctor } = useClinic();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"pending_orders" | "pending_review" | "reviewed" | "all">("pending_orders");
+  const [tab, setTab] = useState<"pending_orders" | "pending_review" | "reviewed" | "actioned" | "all">("pending_review");
   const [results, setResults] = useState<LabResult[]>([]);
   const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,7 +74,7 @@ export default function LabResultsInbox() {
       .eq("clinic_id", profile.clinic_id)
       .order("uploaded_at", { ascending: false });
 
-    if (tab === "pending_review" || tab === "reviewed") query = query.eq("status", tab);
+    if (tab === "pending_review" || tab === "reviewed" || tab === "actioned") query = query.eq("status", tab);
 
     const { data, error } = await query;
     if (!error && data) {
@@ -132,11 +132,18 @@ export default function LabResultsInbox() {
     if (data?.signedUrl) window.open(data.signedUrl, "_blank");
   };
 
-  const handleMarkReviewed = async (id: string) => {
-    await supabase.from("lab_results").update({ status: "reviewed", reviewed_at: new Date().toISOString() }).eq("id", id);
+  const handleMarkReviewed = async (id: string, currentStatus: string) => {
+    // Status flow is forward-only: pending_review → reviewed → actioned
+    if (currentStatus === "actioned" || currentStatus === "reviewed") return;
+    const { error } = await supabase
+      .from("lab_results")
+      .update({ status: "reviewed", reviewed_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("status", "pending_review"); // safety guard
+    if (error) { toast.error("Failed to mark as reviewed"); return; }
     toast.success("Marked as reviewed");
-    fetchResults();
-    setExpanded(null);
+    setResults(prev => prev.map(r => r.id === id ? { ...r, status: "reviewed" as const } : r));
+    setExpanded(prev => prev && prev.id === id ? { ...prev, status: "reviewed" } : prev);
   };
 
   const handleWhatsApp = (result: LabResult) => {
@@ -173,7 +180,7 @@ export default function LabResultsInbox() {
       </div>
 
       <Tabs value={tab} onValueChange={(v: any) => setTab(v)}>
-        <TabsList className="rounded-xl">
+        <TabsList className="rounded-xl flex-wrap h-auto">
           <TabsTrigger value="pending_orders" className="rounded-lg">
             Pending Orders {pendingOrders.length > 0 && <Badge variant="secondary" className="ml-2 h-5 text-xs">{pendingOrders.length}</Badge>}
           </TabsTrigger>
@@ -181,6 +188,7 @@ export default function LabResultsInbox() {
             Pending Review {pendingCount > 0 && <Badge className="ml-2 h-5 text-xs">{pendingCount}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="reviewed" className="rounded-lg">Reviewed</TabsTrigger>
+          <TabsTrigger value="actioned" className="rounded-lg">Actioned</TabsTrigger>
           <TabsTrigger value="all" className="rounded-lg">All Results</TabsTrigger>
         </TabsList>
 
@@ -235,55 +243,81 @@ export default function LabResultsInbox() {
               </CardContent>
             </Card>
           ) : (
-            results.map(r => (
-              <Card key={r.id} className="rounded-2xl border-0 shadow-sm">
-                <CardContent className="p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2">
-                      {r.ai_summary?.urgent && <AlertCircle className="h-4 w-4 text-destructive" fill="currentColor" />}
-                      <h3 className="font-display font-semibold text-foreground">{r.order?.test_name || "Lab Result"}</h3>
-                      <Badge variant="outline" className={`rounded-md text-xs ${statusBadgeClass(r.ai_summary?.overall_status)}`}>
-                        {r.ai_summary?.overall_status || "Pending AI"}
-                      </Badge>
+            results.map(r => {
+              const isPending = r.status === "pending_review";
+              const isReviewed = r.status === "reviewed";
+              const isActioned = r.status === "actioned";
+              const reviewBadgeClass =
+                isActioned ? "bg-purple-500/10 text-purple-600 border-purple-500/20" :
+                isReviewed ? "bg-success/10 text-success border-success/20" :
+                "bg-warning/10 text-warning border-warning/20";
+              const reviewBadgeLabel = isActioned ? "Actioned" : isReviewed ? "Reviewed" : "Pending Review";
+
+              return (
+                <Card key={r.id} className="rounded-2xl border-0 shadow-sm">
+                  <CardContent className="p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {r.ai_summary?.urgent && <AlertCircle className="h-4 w-4 text-destructive" fill="currentColor" />}
+                        <h3 className="font-display font-semibold text-foreground">{r.order?.test_name || "Lab Result"}</h3>
+                        <Badge variant="outline" className={`rounded-md text-xs ${statusBadgeClass(r.ai_summary?.overall_status)}`}>
+                          {r.ai_summary?.overall_status || "Pending AI"}
+                        </Badge>
+                        <Badge variant="outline" className={`rounded-md text-xs ${reviewBadgeClass}`}>
+                          {reviewBadgeLabel}
+                        </Badge>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{new Date(r.uploaded_at).toLocaleString()}</span>
                     </div>
-                    <span className="text-xs text-muted-foreground">{new Date(r.uploaded_at).toLocaleString()}</span>
-                  </div>
 
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Patient: <span className="font-medium text-foreground">{r.patient?.name}</span>
-                    {r.patient?.healthcare_id && <span className="font-mono text-primary"> · {r.patient.healthcare_id}</span>}
-                    {r.lab?.name && <span> · from {r.lab.name}</span>}
-                  </p>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Patient: <span className="font-medium text-foreground">{r.patient?.name}</span>
+                      {r.patient?.healthcare_id && <span className="font-mono text-primary"> · {r.patient.healthcare_id}</span>}
+                      {r.lab?.name && <span> · from {r.lab.name}</span>}
+                    </p>
 
-                  {r.ai_summary?.one_line_summary && (
-                    <div className="rounded-lg bg-primary/5 border border-primary/10 p-3 mb-3">
-                      <p className="text-sm text-foreground">
-                        <span className="text-xs text-primary font-semibold mr-1">AI</span>
-                        {r.ai_summary.one_line_summary}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setExpanded(r)} className="rounded-lg text-xs">
-                      <FileText className="mr-1 h-3 w-3" /> Full Summary
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleViewDocument(r)} className="rounded-lg text-xs">
-                      <ExternalLink className="mr-1 h-3 w-3" /> View Document
-                    </Button>
-                    {r.status === "actioned" ? (
-                      <Button size="sm" variant="outline" disabled className="rounded-lg text-xs opacity-60 cursor-not-allowed">
-                        <CheckCircle className="mr-1 h-3 w-3" /> Actioned
-                      </Button>
-                    ) : (
-                      <Button size="sm" onClick={() => handleActOnResult(r)} className="rounded-lg text-xs">
-                        Act on Result <ArrowRight className="ml-1 h-3 w-3" />
-                      </Button>
+                    {r.ai_summary?.one_line_summary && (
+                      <div className="rounded-lg bg-primary/5 border border-primary/10 p-3 mb-3">
+                        <p className="text-sm text-foreground">
+                          <span className="text-xs text-primary font-semibold mr-1">AI</span>
+                          {r.ai_summary.one_line_summary}
+                        </p>
+                      </div>
                     )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setExpanded(r)} className="rounded-lg text-xs">
+                        <FileText className="mr-1 h-3 w-3" /> Full Summary
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => handleViewDocument(r)} className="rounded-lg text-xs">
+                        <ExternalLink className="mr-1 h-3 w-3" /> View Document
+                      </Button>
+                      {isActioned ? (
+                        <Button size="sm" variant="outline" disabled className="rounded-lg text-xs opacity-60 cursor-not-allowed">
+                          <CheckCircle className="mr-1 h-3 w-3" /> Actioned
+                        </Button>
+                      ) : (
+                        <div className="relative group">
+                          <Button
+                            size="sm"
+                            onClick={() => isReviewed && handleActOnResult(r)}
+                            disabled={!isReviewed}
+                            className={`rounded-lg text-xs ${!isReviewed ? "opacity-50 cursor-not-allowed" : ""}`}
+                          >
+                            Act on Result <ArrowRight className="ml-1 h-3 w-3" />
+                          </Button>
+                          {isPending && (
+                            <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground text-background text-[10px] px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              Review the result first
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
           )}
         </TabsContent>
       </Tabs>
@@ -377,14 +411,21 @@ export default function LabResultsInbox() {
                     <MessageCircle className="mr-2 h-4 w-4" /> Send WhatsApp to Patient
                   </Button>
                 )}
-                {expanded.status !== "reviewed" && (
-                  <Button onClick={() => handleMarkReviewed(expanded.id)} className="rounded-lg">
-                    Mark as Reviewed
+                {expanded.status === "pending_review" && (
+                  <Button onClick={() => handleMarkReviewed(expanded.id, expanded.status)} className="rounded-lg">
+                    <CheckCircle className="mr-2 h-4 w-4" /> Mark as Reviewed
                   </Button>
                 )}
-                <Button variant="default" onClick={() => { setExpanded(null); handleActOnResult(expanded); }} className="rounded-lg">
-                  Open Patient Record <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
+                {expanded.status === "reviewed" && (
+                  <Button variant="outline" disabled className="rounded-lg bg-success/10 text-success border-success/20">
+                    <CheckCircle className="mr-2 h-4 w-4" /> Reviewed ✓
+                  </Button>
+                )}
+                {expanded.status === "reviewed" && (
+                  <Button onClick={() => { setExpanded(null); handleActOnResult(expanded); }} className="rounded-lg">
+                    Act on Result <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
           )}
