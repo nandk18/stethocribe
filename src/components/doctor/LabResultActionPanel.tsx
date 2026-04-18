@@ -78,8 +78,6 @@ export default function LabResultActionPanel({ open, onClose, result, doctorId, 
       setShowShare(false);
       setPrescriptionId(null);
       setPrescriptionPdfUrl(null);
-      setIsRecording(false);
-      setIsTranscribing(false);
     }
   }, [open, result?.id]);
 
@@ -93,48 +91,6 @@ export default function LabResultActionPanel({ open, onClose, result, doctorId, 
     setMedications(prev => prev.map((m, i) => i === idx ? { ...m, ...patch } : m));
   const addMed = () => setMedications(prev => [...prev, emptyMed()]);
   const removeMed = (idx: number) => setMedications(prev => prev.filter((_, i) => i !== idx));
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      chunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-
-      mediaRecorder.onstop = async () => {
-        stream.getTracks().forEach(t => t.stop());
-        const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
-        setIsTranscribing(true);
-        try {
-          const formData = new FormData();
-          formData.append("audio", audioBlob, "recording.webm");
-          const { data, error } = await supabase.functions.invoke("transcribe-audio", { body: formData });
-          if (error) throw error;
-          if (data?.transcript) {
-            setDoctorNotes(prev => prev ? prev + "\n" + data.transcript : data.transcript);
-          }
-        } catch (err: any) {
-          toast.error("Transcription failed: " + (err.message || "Unknown error"));
-        } finally {
-          setIsTranscribing(false);
-        }
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-    } catch {
-      toast.error("Microphone access denied");
-    }
-  };
-
-  const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
-    setIsRecording(false);
-  };
 
   const handleGenerate = async () => {
     if (!result || !doctorId) return;
