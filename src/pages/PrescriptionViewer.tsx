@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Printer } from "lucide-react";
+import { printPrescription } from "@/lib/prescriptionUtils";
 
 export default function PrescriptionViewer() {
   const { prescriptionId } = useParams<{ prescriptionId: string }>();
@@ -50,21 +51,14 @@ export default function PrescriptionViewer() {
   }, [prescriptionId]);
 
   const handlePrint = () => {
-    if (!htmlContent) return;
-    const iframe = document.createElement("iframe");
-    iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
-    document.body.appendChild(iframe);
-    const doc = iframe.contentWindow?.document;
-    if (!doc) return;
-    doc.open();
-    doc.write(htmlContent);
-    doc.close();
-    iframe.contentWindow?.addEventListener("load", () => {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
-      setTimeout(() => document.body.removeChild(iframe), 1000);
-    });
+    if (prescriptionId) printPrescription(prescriptionId);
   };
+
+  // Strip any inline print buttons embedded in the prescription HTML so we
+  // never end up with two competing print buttons.
+  const cleanHtml = htmlContent
+    .replace(/<button[^>]*onclick=["']window\.print\(\)["'][\s\S]*?<\/button>/gi, "")
+    .replace(/<div class=["']no-print["'][\s\S]*?<\/div>/gi, "");
 
   if (loading) {
     return (
