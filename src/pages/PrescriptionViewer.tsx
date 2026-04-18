@@ -8,7 +8,6 @@ export default function PrescriptionViewer() {
   const [htmlContent, setHtmlContent] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -28,8 +27,6 @@ export default function PrescriptionViewer() {
           setError("Prescription not found or link has expired.");
           return;
         }
-
-        setPdfUrl(prescription.pdf_url);
 
         const { data: signedData, error: signErr } = await supabase.storage
           .from("prescriptions")
@@ -52,26 +49,21 @@ export default function PrescriptionViewer() {
     load();
   }, [prescriptionId]);
 
-  const handlePrint = async () => {
-    if (!pdfUrl) return;
-    try {
-      const { data: signedData } = await supabase.storage
-        .from("prescriptions")
-        .createSignedUrl(pdfUrl, 3600);
-
-      if (!signedData?.signedUrl) return;
-
-      // Open the raw HTML in a new window and print it
-      const printWindow = window.open(signedData.signedUrl, "_blank");
-      if (printWindow) {
-        printWindow.addEventListener("load", () => {
-          printWindow.print();
-        });
-      }
-    } catch {
-      // Fallback to printing current page
-      window.print();
-    }
+  const handlePrint = () => {
+    if (!htmlContent) return;
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+    document.body.appendChild(iframe);
+    const doc = iframe.contentWindow?.document;
+    if (!doc) return;
+    doc.open();
+    doc.write(htmlContent);
+    doc.close();
+    iframe.contentWindow?.addEventListener("load", () => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      setTimeout(() => document.body.removeChild(iframe), 1000);
+    });
   };
 
   if (loading) {
@@ -99,8 +91,8 @@ export default function PrescriptionViewer() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Top bar */}
+    <div className="min-h-screen bg-gray-100 overflow-x-hidden">
+      {/* Top bar with the ONLY print button */}
       <div className="no-print bg-teal-700 text-white px-4 py-2.5 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-2 text-sm font-medium">
           <span>🩺</span>
@@ -117,7 +109,7 @@ export default function PrescriptionViewer() {
 
       {/* Render the prescription HTML */}
       <div
-        className="max-w-3xl mx-auto my-4 bg-white shadow-lg"
+        className="max-w-3xl mx-auto my-4 bg-white shadow-lg overflow-x-hidden"
         dangerouslySetInnerHTML={{ __html: htmlContent }}
       />
 

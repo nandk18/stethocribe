@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { FlaskConical, Loader2, Send, ExternalLink, Plus, Trash2 } from "lucide-react";
+import { FlaskConical, Loader2, Send, ExternalLink, Plus, Trash2, Mic, MicOff, CheckCircle2, ArrowRight } from "lucide-react";
 import PrescriptionShareModal from "@/components/doctor/PrescriptionShareModal";
 
 type Medication = {
@@ -21,6 +22,7 @@ type LabResultLite = {
   id: string;
   file_url: string | null;
   ai_summary: any;
+  status?: string | null;
   patient_id: string;
   patient: { name: string; healthcare_id: string | null; phone: string | null; email: string | null } | null;
   order: { test_name: string; visit_id: string | null } | null;
@@ -51,6 +53,7 @@ const emptyMed = (): Medication => ({
 });
 
 export default function LabResultActionPanel({ open, onClose, result, doctorId, doctorName, clinicName, onActioned }: Props) {
+  const navigate = useNavigate();
   const [doctorNotes, setDoctorNotes] = useState("");
   const [medications, setMedications] = useState<Medication[]>([emptyMed()]);
   const [followUpDate, setFollowUpDate] = useState("");
@@ -58,6 +61,14 @@ export default function LabResultActionPanel({ open, onClose, result, doctorId, 
   const [showShare, setShowShare] = useState(false);
   const [prescriptionId, setPrescriptionId] = useState<string | null>(null);
   const [prescriptionPdfUrl, setPrescriptionPdfUrl] = useState<string | null>(null);
+
+  // Voice recording
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
+  const isActioned = result?.status === "actioned";
 
   useEffect(() => {
     if (open) {
@@ -67,6 +78,8 @@ export default function LabResultActionPanel({ open, onClose, result, doctorId, 
       setShowShare(false);
       setPrescriptionId(null);
       setPrescriptionPdfUrl(null);
+      setIsRecording(false);
+      setIsTranscribing(false);
     }
   }, [open, result?.id]);
 
@@ -80,6 +93,48 @@ export default function LabResultActionPanel({ open, onClose, result, doctorId, 
     setMedications(prev => prev.map((m, i) => i === idx ? { ...m, ...patch } : m));
   const addMed = () => setMedications(prev => [...prev, emptyMed()]);
   const removeMed = (idx: number) => setMedications(prev => prev.filter((_, i) => i !== idx));
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
+        setIsTranscribing(true);
+        try {
+          const formData = new FormData();
+          formData.append("audio", audioBlob, "recording.webm");
+          const { data, error } = await supabase.functions.invoke("transcribe-audio", { body: formData });
+          if (error) throw error;
+          if (data?.transcript) {
+            setDoctorNotes(prev => prev ? prev + "\n" + data.transcript : data.transcript);
+          }
+        } catch (err: any) {
+          toast.error("Transcription failed: " + (err.message || "Unknown error"));
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch {
+      toast.error("Microphone access denied");
+    }
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
+  };
 
   const handleGenerate = async () => {
     if (!result || !doctorId) return;
@@ -124,7 +179,7 @@ export default function LabResultActionPanel({ open, onClose, result, doctorId, 
       if (pdfErr) {
         console.warn("PDF generation failed:", pdfErr);
       }
-      setPrescriptionPdfUrl(pdfData?.pdf_url || pdfData?.url || null);
+      setPrescriptionPdfUrl(pdfData?.path || pdfData?.pdf_url || pdfData?.url || null);
       setPrescriptionId(prescription.id);
       setShowShare(true);
       toast.success("Prescription generated");
@@ -189,72 +244,114 @@ export default function LabResultActionPanel({ open, onClose, result, doctorId, 
               <ExternalLink className="mr-2 h-4 w-4" /> View Full Document
             </Button>
 
-            {/* Doctor notes */}
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">Clinical Response / Doctor's Notes</Label>
-              <Textarea
-                value={doctorNotes}
-                onChange={e => setDoctorNotes(e.target.value)}
-                placeholder="Your interpretation and response to this result..."
-                rows={4}
-                className="rounded-lg"
-              />
-            </div>
-
-            {/* Medications */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-semibold">Medications</Label>
-                <Button type="button" variant="outline" size="sm" onClick={addMed} className="rounded-lg text-xs">
-                  <Plus className="mr-1 h-3 w-3" /> Add Medicine
+            {isActioned ? (
+              /* Already actioned — read-only state */
+              <div className="rounded-xl bg-success/5 border border-success/20 p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-success" />
+                  <span className="font-semibold text-foreground">Already Actioned</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  A prescription was generated for this result. To make changes, go to the patient's history.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/dashboard/patients/${result.patient_id}`)}
+                  className="rounded-lg text-xs"
+                >
+                  Go to Patient History <ArrowRight className="ml-1 h-3 w-3" />
                 </Button>
               </div>
-              <div className="space-y-2">
-                {medications.map((med, i) => (
-                  <div key={i} className="rounded-lg border p-3 space-y-2">
-                    <div className="grid grid-cols-12 gap-2">
-                      <Input className="col-span-7 rounded-md" placeholder="Medicine name"
-                        value={med.name} onChange={e => updateMed(i, { name: e.target.value })} />
-                      <Input className="col-span-4 rounded-md" placeholder="Dosage"
-                        value={med.dosage} onChange={e => updateMed(i, { dosage: e.target.value })} />
-                      <Button type="button" variant="ghost" size="icon" className="col-span-1 h-9 w-9 text-destructive"
-                        onClick={() => removeMed(i)} disabled={medications.length === 1}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="flex flex-wrap gap-3 text-xs">
-                      {(["morning", "afternoon", "evening", "night"] as const).map(t => (
-                        <label key={t} className="flex items-center gap-1.5 cursor-pointer">
-                          <Checkbox checked={med[t]} onCheckedChange={v => updateMed(i, { [t]: !!v })} />
-                          <span className="capitalize">{t[0].toUpperCase()}</span>
-                        </label>
-                      ))}
-                      <Input className="flex-1 min-w-[100px] h-8 rounded-md text-xs" placeholder="Duration (e.g. 5 days)"
-                        value={med.duration} onChange={e => updateMed(i, { duration: e.target.value })} />
-                    </div>
-                    <Input className="rounded-md text-xs h-8" placeholder="Instructions (optional)"
-                      value={med.notes} onChange={e => updateMed(i, { notes: e.target.value })} />
+            ) : (
+              <>
+                {/* Doctor notes with voice scribe */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-semibold">Clinical Response / Doctor's Notes</Label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={isRecording ? stopRecording : startRecording}
+                      disabled={isTranscribing}
+                      className={`rounded-full text-xs h-8 ${
+                        isRecording ? "bg-destructive hover:bg-destructive/90 animate-pulse" : ""
+                      }`}
+                    >
+                      {isTranscribing ? (
+                        <><Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> Transcribing...</>
+                      ) : isRecording ? (
+                        <><MicOff className="mr-1.5 h-3 w-3" /> Stop Recording</>
+                      ) : (
+                        <><Mic className="mr-1.5 h-3 w-3" /> Voice Note</>
+                      )}
+                    </Button>
                   </div>
-                ))}
-              </div>
-            </div>
+                  <Textarea
+                    value={doctorNotes}
+                    onChange={e => setDoctorNotes(e.target.value)}
+                    placeholder="Speak or type your clinical interpretation..."
+                    rows={4}
+                    className="rounded-lg"
+                  />
+                </div>
 
-            {/* Follow up */}
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">Follow-up Date</Label>
-              <Input type="date" value={followUpDate}
-                onChange={e => setFollowUpDate(e.target.value)} className="rounded-lg max-w-xs" />
-            </div>
+                {/* Medications */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-semibold">Medications</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={addMed} className="rounded-lg text-xs">
+                      <Plus className="mr-1 h-3 w-3" /> Add Medicine
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {medications.map((med, i) => (
+                      <div key={i} className="rounded-lg border p-3 space-y-2">
+                        <div className="grid grid-cols-12 gap-2">
+                          <Input className="col-span-7 rounded-md" placeholder="Medicine name"
+                            value={med.name} onChange={e => updateMed(i, { name: e.target.value })} />
+                          <Input className="col-span-4 rounded-md" placeholder="Dosage"
+                            value={med.dosage} onChange={e => updateMed(i, { dosage: e.target.value })} />
+                          <Button type="button" variant="ghost" size="icon" className="col-span-1 h-9 w-9 text-destructive"
+                            onClick={() => removeMed(i)} disabled={medications.length === 1}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="flex flex-wrap gap-3 text-xs">
+                          {(["morning", "afternoon", "evening", "night"] as const).map(t => (
+                            <label key={t} className="flex items-center gap-1.5 cursor-pointer">
+                              <Checkbox checked={med[t]} onCheckedChange={v => updateMed(i, { [t]: !!v })} />
+                              <span className="capitalize">{t[0].toUpperCase()}</span>
+                            </label>
+                          ))}
+                          <Input className="flex-1 min-w-[100px] h-8 rounded-md text-xs" placeholder="Duration (e.g. 5 days)"
+                            value={med.duration} onChange={e => updateMed(i, { duration: e.target.value })} />
+                        </div>
+                        <Input className="rounded-md text-xs h-8" placeholder="Instructions (optional)"
+                          value={med.notes} onChange={e => updateMed(i, { notes: e.target.value })} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-            {/* Actions */}
-            <div className="flex gap-2 pt-2 border-t">
-              <Button variant="outline" onClick={onClose} disabled={submitting} className="flex-1 rounded-lg">
-                Cancel
-              </Button>
-              <Button onClick={handleGenerate} disabled={submitting} className="flex-1 rounded-lg">
-                {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating...</> : <><Send className="mr-2 h-4 w-4" /> Generate & Send Prescription</>}
-              </Button>
-            </div>
+                {/* Follow up */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Follow-up Date</Label>
+                  <Input type="date" value={followUpDate}
+                    onChange={e => setFollowUpDate(e.target.value)} className="rounded-lg max-w-xs" />
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-2 border-t">
+                  <Button variant="outline" onClick={onClose} disabled={submitting} className="flex-1 rounded-lg">
+                    Cancel
+                  </Button>
+                  <Button onClick={handleGenerate} disabled={submitting} className="flex-1 rounded-lg">
+                    {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating...</> : <><Send className="mr-2 h-4 w-4" /> Generate & Send Prescription</>}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </SheetContent>
       </Sheet>
