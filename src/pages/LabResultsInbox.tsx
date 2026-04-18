@@ -53,7 +53,7 @@ export default function LabResultsInbox() {
   const { profile } = useAuth();
   const { clinic, doctor } = useClinic();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"pending_orders" | "pending_review" | "reviewed" | "all">("pending_orders");
+  const [tab, setTab] = useState<"pending_orders" | "pending_review" | "reviewed" | "actioned" | "all">("pending_review");
   const [results, setResults] = useState<LabResult[]>([]);
   const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,7 +74,7 @@ export default function LabResultsInbox() {
       .eq("clinic_id", profile.clinic_id)
       .order("uploaded_at", { ascending: false });
 
-    if (tab === "pending_review" || tab === "reviewed") query = query.eq("status", tab);
+    if (tab === "pending_review" || tab === "reviewed" || tab === "actioned") query = query.eq("status", tab);
 
     const { data, error } = await query;
     if (!error && data) {
@@ -132,11 +132,18 @@ export default function LabResultsInbox() {
     if (data?.signedUrl) window.open(data.signedUrl, "_blank");
   };
 
-  const handleMarkReviewed = async (id: string) => {
-    await supabase.from("lab_results").update({ status: "reviewed", reviewed_at: new Date().toISOString() }).eq("id", id);
+  const handleMarkReviewed = async (id: string, currentStatus: string) => {
+    // Status flow is forward-only: pending_review → reviewed → actioned
+    if (currentStatus === "actioned" || currentStatus === "reviewed") return;
+    const { error } = await supabase
+      .from("lab_results")
+      .update({ status: "reviewed", reviewed_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("status", "pending_review"); // safety guard
+    if (error) { toast.error("Failed to mark as reviewed"); return; }
     toast.success("Marked as reviewed");
-    fetchResults();
-    setExpanded(null);
+    setResults(prev => prev.map(r => r.id === id ? { ...r, status: "reviewed" as const } : r));
+    setExpanded(prev => prev && prev.id === id ? { ...prev, status: "reviewed" } : prev);
   };
 
   const handleWhatsApp = (result: LabResult) => {
