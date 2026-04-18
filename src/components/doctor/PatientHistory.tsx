@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useClinic } from "@/hooks/useClinic";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Calendar, ChevronDown, FileText, Pill, ExternalLink, FlaskConical, AlertTriangle } from "lucide-react";
+import { Calendar, ChevronDown, FileText, Pill, ExternalLink, FlaskConical, AlertTriangle, Pencil } from "lucide-react";
 import VitalsTrends from "@/components/vitals/VitalsTrends";
 import { renderClinicalNotes } from "@/lib/templateFields";
+import EditVisitSheet from "@/components/doctor/EditVisitSheet";
 
 type Props = {
   patientId: string;
@@ -20,8 +23,8 @@ type HistoryVisit = {
   chief_complaint: string | null;
   status: string | null;
   doctors: { name: string; qualification: string | null } | null;
-  clinical_notes: { soap_notes: any; raw_transcript: string | null }[];
-  prescriptions: { id: string; medications: any; investigations: any; follow_up_date: string | null; pdf_url: string | null }[];
+  clinical_notes: { id: string; doctor_id: string; soap_notes: any; raw_transcript: string | null; updated_at?: string | null }[];
+  prescriptions: { id: string; doctor_id: string; medications: any; investigations: any; follow_up_date: string | null; pdf_url: string | null; notes: string | null; updated_at?: string | null }[];
 };
 
 type LabOrder = {
@@ -36,9 +39,14 @@ type LabOrder = {
 };
 
 export default function PatientHistory({ patientId, currentVisitId }: Props) {
+  const { profile } = useAuth();
+  const { doctor } = useClinic();
   const [history, setHistory] = useState<HistoryVisit[]>([]);
   const [labOrders, setLabOrders] = useState<LabOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingVisit, setEditingVisit] = useState<any>(null);
+
+  const canEdit = profile?.role === "doctor" || profile?.role === "admin";
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -48,8 +56,8 @@ export default function PatientHistory({ patientId, currentVisitId }: Props) {
         .select(`
           id, visit_date, token_number, chief_complaint, status,
           doctors(name, qualification),
-          clinical_notes(soap_notes, raw_transcript),
-          prescriptions(id, medications, investigations, follow_up_date, pdf_url)
+          clinical_notes(id, doctor_id, soap_notes, raw_transcript, updated_at),
+          prescriptions(id, doctor_id, medications, investigations, follow_up_date, pdf_url, notes, updated_at)
         `)
         .eq("patient_id", patientId)
         .neq("id", currentVisitId)
@@ -187,12 +195,20 @@ export default function PatientHistory({ patientId, currentVisitId }: Props) {
         <p className="text-sm text-muted-foreground">{history.length} previous visit{history.length !== 1 ? "s" : ""}</p>
       )}
       {history.map(visit => {
-        const soap = visit.clinical_notes?.[0]?.soap_notes;
-        const meds = visit.prescriptions?.[0]?.medications;
-        const prescriptionId = visit.prescriptions?.[0]?.id;
+        const note = visit.clinical_notes?.[0];
+        const soap = note?.soap_notes;
+        const prescription = visit.prescriptions?.[0];
+        const meds = prescription?.medications;
+        const prescriptionId = prescription?.id;
+        const noteDoctorId = note?.doctor_id;
+        const lastEdited = note?.updated_at || prescription?.updated_at;
 
-        // Get a display field for the summary line
         const displayField = soap?.assessment || soap?.diagnosis || soap?.admission_diagnosis || soap?.current_status;
+
+        const canEditThis = canEdit && doctor?.id && (
+          (note && noteDoctorId === doctor.id) ||
+          (prescription && prescription.doctor_id === doctor.id)
+        );
 
         return (
           <Card key={visit.id} className="shadow-card">
@@ -208,6 +224,9 @@ export default function PatientHistory({ patientId, currentVisitId }: Props) {
                     <p className="text-xs text-muted-foreground mt-0.5">
                       Dr. {visit.doctors.name}{visit.doctors.qualification && `, ${visit.doctors.qualification}`}
                     </p>
+                  )}
+                  {lastEdited && (
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Last edited: {new Date(lastEdited).toLocaleString()}</p>
                   )}
                 </div>
                 <Badge variant="outline" className="text-[10px]">{visit.status}</Badge>
@@ -231,7 +250,7 @@ export default function PatientHistory({ patientId, currentVisitId }: Props) {
                 </div>
               )}
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 {soap && (
                   <Collapsible>
                     <CollapsibleTrigger asChild>
@@ -255,11 +274,37 @@ export default function PatientHistory({ patientId, currentVisitId }: Props) {
                     <ExternalLink className="mr-1 h-3 w-3" /> View Prescription
                   </Button>
                 )}
+
+                {canEditThis && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-7 border-primary/30 text-primary hover:bg-primary/10"
+                    onClick={() => setEditingVisit({
+                      id: visit.id,
+                      clinical_notes_id: note?.id || null,
+                      soap_notes: soap || {},
+                      prescription_id: prescription?.id || null,
+                      medications: prescription?.medications || [],
+                      follow_up_date: prescription?.follow_up_date || null,
+                      prescription_notes: prescription?.notes || null,
+                    })}
+                  >
+                    <Pencil className="mr-1 h-3 w-3" /> Edit Notes & Rx
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
         );
       })}
+
+      <EditVisitSheet
+        open={!!editingVisit}
+        onClose={() => setEditingVisit(null)}
+        visit={editingVisit}
+        onSaved={() => fetchHistory()}
+      />
     </div>
   );
 }

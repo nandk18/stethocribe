@@ -424,13 +424,6 @@ ${prescription.follow_up_date ? `
   <span>${new Date().toLocaleString("en-IN")}</span>
 </div>
 
-<div class="no-print" style="text-align:center;margin-top:20px;">
-  <button onclick="this.parentElement.style.display='none';window.print();"
-    style="background:#0D6E6E;color:white;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;">
-    🖨️ Print / Save PDF
-  </button>
-</div>
-
 </body>
 </html>`
 

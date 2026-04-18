@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
-import { FlaskConical, FileText, AlertCircle, ExternalLink, Loader2, ArrowRight, MessageCircle } from "lucide-react";
+import { FlaskConical, FileText, AlertCircle, ExternalLink, Loader2, ArrowRight, MessageCircle, CheckCircle } from "lucide-react";
 import LabResultActionPanel from "@/components/doctor/LabResultActionPanel";
 import { useClinic } from "@/hooks/useClinic";
 
@@ -271,9 +271,15 @@ export default function LabResultsInbox() {
                     <Button size="sm" variant="outline" onClick={() => handleViewDocument(r)} className="rounded-lg text-xs">
                       <ExternalLink className="mr-1 h-3 w-3" /> View Document
                     </Button>
-                    <Button size="sm" onClick={() => handleActOnResult(r)} className="rounded-lg text-xs">
-                      Act on Result <ArrowRight className="ml-1 h-3 w-3" />
-                    </Button>
+                    {r.status === "actioned" ? (
+                      <Button size="sm" variant="outline" disabled className="rounded-lg text-xs opacity-60 cursor-not-allowed">
+                        <CheckCircle className="mr-1 h-3 w-3" /> Actioned
+                      </Button>
+                    ) : (
+                      <Button size="sm" onClick={() => handleActOnResult(r)} className="rounded-lg text-xs">
+                        Act on Result <ArrowRight className="ml-1 h-3 w-3" />
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
