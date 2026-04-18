@@ -238,7 +238,9 @@ serve(async (req) => {
 <style>
   @page { size: A4; margin: 16mm 14mm; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Noto Sans', Arial, sans-serif; font-size: 11px; color: #1a1a1a; max-width: 210mm; margin: 0 auto; padding: 14mm; }
+  html, body { overflow-x: hidden; }
+  body { font-family: 'Noto Sans', Arial, sans-serif; font-size: 11px; color: #1a1a1a; max-width: 210mm; width: 100%; margin: 0 auto; padding: 14mm; word-break: break-word; }
+  table { table-layout: auto; word-break: break-word; }
   .regional { font-family: 'Noto Sans Tamil','Noto Sans Devanagari','Noto Sans Telugu','Noto Sans Kannada','Noto Sans Malayalam','Noto Sans Bengali','Noto Sans Gujarati','Noto Sans Gurmukhi','Noto Sans Oriya','Noto Nastaliq Urdu','Noto Sans', sans-serif; }
   .header { display: flex; justify-content: space-between; align-items: flex-start; background: #0D4444; color: white; padding: 14px 16px; border-radius: 6px 6px 0 0; }
   .clinic-block .clinic-name { font-size: 20px; font-weight: 800; color: #ffffff; letter-spacing: -0.3px; }

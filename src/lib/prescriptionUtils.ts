@@ -16,44 +16,52 @@ export const copyPrescriptionLink = async (prescriptionId: string) => {
   return url;
 };
 
-// Print prescription via hidden iframe (loads HTML directly from storage)
+// Print prescription via hidden iframe using a blob URL
+// (load event fires reliably for iframe.src=blobUrl, unlike document.write)
 export const printPrescription = async (prescriptionId: string) => {
-  const { data } = await supabase
-    .from("prescriptions")
-    .select("pdf_url")
-    .eq("id", prescriptionId)
-    .single();
+  try {
+    const { data } = await supabase
+      .from("prescriptions")
+      .select("pdf_url")
+      .eq("id", prescriptionId)
+      .single();
 
-  if (!data?.pdf_url) {
+    if (!data?.pdf_url) {
+      window.open(getPrescriptionViewerUrl(prescriptionId), "_blank");
+      return;
+    }
+
+    const { data: signedData } = await supabase.storage
+      .from("prescriptions")
+      .createSignedUrl(data.pdf_url, 3600);
+
+    if (!signedData?.signedUrl) {
+      window.open(getPrescriptionViewerUrl(prescriptionId), "_blank");
+      return;
+    }
+
+    const res = await fetch(signedData.signedUrl);
+    const html = await res.text();
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const blobUrl = URL.createObjectURL(blob);
+
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+    iframe.src = blobUrl;
+    document.body.appendChild(iframe);
+
+    iframe.onload = () => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      setTimeout(() => {
+        if (iframe.parentNode) document.body.removeChild(iframe);
+        URL.revokeObjectURL(blobUrl);
+      }, 2000);
+    };
+  } catch {
     window.open(getPrescriptionViewerUrl(prescriptionId), "_blank");
-    return;
   }
-
-  const { data: signedData } = await supabase.storage
-    .from("prescriptions")
-    .createSignedUrl(data.pdf_url, 3600);
-
-  if (!signedData?.signedUrl) {
-    window.open(getPrescriptionViewerUrl(prescriptionId), "_blank");
-    return;
-  }
-
-  const res = await fetch(signedData.signedUrl);
-  const html = await res.text();
-
-  const iframe = document.createElement("iframe");
-  iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
-  document.body.appendChild(iframe);
-  const doc = iframe.contentWindow?.document;
-  if (!doc) return;
-  doc.open();
-  doc.write(html);
-  doc.close();
-  iframe.contentWindow?.addEventListener("load", () => {
-    iframe.contentWindow?.focus();
-    iframe.contentWindow?.print();
-    setTimeout(() => document.body.removeChild(iframe), 1000);
-  });
 };
 
 // WhatsApp share — uses /rx/ viewer link
