@@ -300,6 +300,12 @@ export default function LabResultActionPanel({ open, onClose, result, doctorId, 
                       <Plus className="mr-1 h-3 w-3" /> Add Medicine
                     </Button>
                   </div>
+                  {isFormattingMeds && (
+                    <div className="flex items-center gap-2 text-xs text-primary bg-primary/5 border border-primary/10 rounded-lg px-3 py-2">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Extracting medications from voice...
+                    </div>
+                  )}
                   <div className="space-y-2">
                     {medications.map((med, i) => (
                       <div key={i} className="rounded-lg border p-3 space-y-2">
