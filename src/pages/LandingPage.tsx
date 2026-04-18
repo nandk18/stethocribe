@@ -48,6 +48,7 @@ const slideInRight = {
 
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
+  { label: "Lab Workflow", href: "#lab-workflow" },
   { label: "Pricing", href: "#pricing" },
   { label: "Contact", href: "#contact" },
 ];
