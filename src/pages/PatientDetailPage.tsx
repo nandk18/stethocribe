@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useClinic } from "@/hooks/useClinic";
 import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,10 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ArrowLeft, Calendar, ChevronDown, FileText, Pill, ExternalLink, Loader2, Phone, Mail, AlertTriangle, Activity, User, Trash2 } from "lucide-react";
+import { ArrowLeft, Calendar, ChevronDown, FileText, Pill, ExternalLink, Loader2, Phone, Mail, AlertTriangle, Activity, Trash2, Pencil } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import VitalsTrends from "@/components/vitals/VitalsTrends";
 import { renderClinicalNotes } from "@/lib/templateFields";
+import EditVisitSheet from "@/components/doctor/EditVisitSheet";
 
 type Patient = {
   id: string; name: string; healthcare_id: string | null; gender: string | null;
@@ -23,50 +25,55 @@ type HistoryVisit = {
   id: string; visit_date: string | null; token_number: number;
   chief_complaint: string | null; status: string | null;
   doctors: { name: string; qualification: string | null } | null;
-  clinical_notes: { soap_notes: any; raw_transcript: string | null }[];
-  prescriptions: { id: string; medications: any; investigations: any; follow_up_date: string | null; pdf_url: string | null; notes: string | null }[];
+  clinical_notes: { id: string; doctor_id: string; soap_notes: any; raw_transcript: string | null; updated_at?: string | null }[];
+  prescriptions: { id: string; doctor_id: string; medications: any; investigations: any; follow_up_date: string | null; pdf_url: string | null; notes: string | null; updated_at?: string | null }[];
 };
 
 export default function PatientDetailPage() {
   const { patientId } = useParams<{ patientId: string }>();
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const { doctor } = useClinic();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [visits, setVisits] = useState<HistoryVisit[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [editingVisit, setEditingVisit] = useState<any>(null);
 
   const isAdmin = profile?.role === "admin";
+  const canEdit = profile?.role === "doctor" || profile?.role === "admin";
 
   const getAge = (dob: string | null) => {
     if (!dob) return null;
     return Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
   };
 
-  useEffect(() => {
+  const fetchData = async () => {
     if (!patientId || !profile?.clinic_id) return;
-    const fetchData = async () => {
-      setLoading(true);
-      const [patientRes, visitsRes] = await Promise.all([
-        supabase.from("patients").select("*").eq("id", patientId).eq("clinic_id", profile.clinic_id).single(),
-        supabase.from("visits").select(`
-          id, visit_date, token_number, chief_complaint, status,
-          doctors(name, qualification),
-          clinical_notes(soap_notes, raw_transcript),
-          prescriptions(id, medications, investigations, follow_up_date, pdf_url, notes)
-        `).eq("patient_id", patientId).order("visit_date", { ascending: false }).limit(50),
-      ]);
-      if (patientRes.data) setPatient(patientRes.data as any);
-      if (visitsRes.data) {
-        setVisits(visitsRes.data.map((v: any) => ({
-          ...v,
-          doctors: Array.isArray(v.doctors) ? v.doctors[0] ?? null : v.doctors,
-        })));
-      }
-      setLoading(false);
-    };
+    setLoading(true);
+    const [patientRes, visitsRes] = await Promise.all([
+      supabase.from("patients").select("*").eq("id", patientId).eq("clinic_id", profile.clinic_id).single(),
+      supabase.from("visits").select(`
+        id, visit_date, token_number, chief_complaint, status,
+        doctors(name, qualification),
+        clinical_notes(id, doctor_id, soap_notes, raw_transcript, updated_at),
+        prescriptions(id, doctor_id, medications, investigations, follow_up_date, pdf_url, notes, updated_at)
+      `).eq("patient_id", patientId).order("visit_date", { ascending: false }).limit(50),
+    ]);
+    if (patientRes.data) setPatient(patientRes.data as any);
+    if (visitsRes.data) {
+      setVisits(visitsRes.data.map((v: any) => ({
+        ...v,
+        doctors: Array.isArray(v.doctors) ? v.doctors[0] ?? null : v.doctors,
+      })));
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patientId, profile?.clinic_id]);
 
   const handleDeletePatient = async () => {
@@ -186,11 +193,19 @@ export default function PatientDetailPage() {
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">{visits.length} visit{visits.length !== 1 ? "s" : ""}</p>
           {visits.map(visit => {
-            const soap = visit.clinical_notes?.[0]?.soap_notes;
-            const meds = visit.prescriptions?.[0]?.medications;
-            const prescriptionId = visit.prescriptions?.[0]?.id;
+            const note = visit.clinical_notes?.[0];
+            const soap = note?.soap_notes;
+            const prescription = visit.prescriptions?.[0];
+            const meds = prescription?.medications;
+            const prescriptionId = prescription?.id;
+            const lastEdited = note?.updated_at || prescription?.updated_at;
 
             const displayField = soap?.assessment || soap?.diagnosis || soap?.admission_diagnosis || soap?.current_status;
+
+            const canEditThis = canEdit && doctor?.id && (
+              (note && note.doctor_id === doctor.id) ||
+              (prescription && prescription.doctor_id === doctor.id)
+            );
 
             return (
               <Card key={visit.id} className="shadow-card">
@@ -206,6 +221,9 @@ export default function PatientDetailPage() {
                         <p className="text-xs text-muted-foreground mt-0.5">
                           Dr. {visit.doctors.name}{visit.doctors.qualification && `, ${visit.doctors.qualification}`}
                         </p>
+                      )}
+                      {lastEdited && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Last edited: {new Date(lastEdited).toLocaleString()}</p>
                       )}
                     </div>
                     <Badge variant="outline" className="text-[10px] capitalize">{visit.status}</Badge>
@@ -229,7 +247,7 @@ export default function PatientDetailPage() {
                     </div>
                   )}
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     {soap && (
                       <Collapsible>
                         <CollapsibleTrigger asChild>
@@ -252,6 +270,24 @@ export default function PatientDetailPage() {
                         <ExternalLink className="mr-1 h-3 w-3" /> View Prescription
                       </Button>
                     )}
+                    {canEditThis && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-7 border-primary/30 text-primary hover:bg-primary/10"
+                        onClick={() => setEditingVisit({
+                          id: visit.id,
+                          clinical_notes_id: note?.id || null,
+                          soap_notes: soap || {},
+                          prescription_id: prescription?.id || null,
+                          medications: prescription?.medications || [],
+                          follow_up_date: prescription?.follow_up_date || null,
+                          prescription_notes: prescription?.notes || null,
+                        })}
+                      >
+                        <Pencil className="mr-1 h-3 w-3" /> Edit Notes & Rx
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -259,6 +295,14 @@ export default function PatientDetailPage() {
           })}
         </div>
       )}
+
+      {/* Edit Visit Sheet */}
+      <EditVisitSheet
+        open={!!editingVisit}
+        onClose={() => setEditingVisit(null)}
+        visit={editingVisit}
+        onSaved={() => fetchData()}
+      />
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
