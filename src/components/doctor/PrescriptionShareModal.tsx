@@ -105,13 +105,9 @@ export default function PrescriptionShareModal({ open, onClose, prescriptionPdfU
   };
 
   const handlePrint = async () => {
-    if (!signedUrl) return;
-    if (isHtml) {
-      const blobUrl = await openHtmlAsBlobUrl(signedUrl);
-      if (blobUrl) window.open(blobUrl, "_blank");
-    } else {
-      window.open(signedUrl, "_blank");
-    }
+    if (!prescriptionId) return;
+    const { printPrescription } = await import("@/lib/prescriptionUtils");
+    await printPrescription(prescriptionId);
   };
 
   const shareReady = !!viewerUrl;
