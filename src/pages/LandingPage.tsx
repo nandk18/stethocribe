@@ -328,6 +328,176 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* LAB WORKFLOW SECTION */}
+      <section id="lab-workflow" className="py-20 bg-white">
+        <div className="max-w-6xl mx-auto px-6">
+          {/* Header */}
+          <div className="text-center mb-14">
+            <span className="inline-block bg-teal-50 text-teal-700 text-xs font-semibold px-4 py-1.5 rounded-full border border-teal-200 mb-4">
+              🧪 Lab Integration
+            </span>
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              From Lab Order to Prescription<br />Without the Patient Revisiting
+            </h2>
+            <p className="text-gray-500 max-w-2xl mx-auto text-lg">
+              Order investigations during consultation, lab uploads results,
+              AI summarises findings, doctor prescribes — all digitally.
+              Patient receives prescription on WhatsApp.
+            </p>
+          </div>
+
+          {/* Flow diagram — horizontal on desktop, vertical on mobile */}
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-16">
+            {[
+              { icon: "🩺", role: "Doctor", action: "Orders Investigation", detail: "Selects test, lab and urgency during consultation", color: "teal" },
+              { icon: "🧪", role: "Lab", action: "Receives & Uploads Result", detail: "Lab logs in, sees pending orders, uploads PDF or image", color: "blue" },
+              { icon: "🤖", role: "AI", action: "Summarises Report", detail: "Flags abnormal values, interprets findings, suggests actions", color: "purple" },
+              { icon: "👨‍⚕️", role: "Doctor", action: "Reviews & Prescribes", detail: "Reads AI summary, adds notes, prescribes without patient visit", color: "teal" },
+              { icon: "📱", role: "Patient", action: "Gets Prescription", detail: "Receives bilingual prescription on WhatsApp instantly", color: "green" },
+            ].map((step, i, arr) => (
+              <div key={i} className="flex flex-col md:flex-row items-center gap-4 flex-1">
+                <div className="flex flex-col items-center text-center flex-1">
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-2xl mb-3 shadow-sm ${
+                    step.color === "teal" ? "bg-teal-50 border border-teal-200" :
+                    step.color === "blue" ? "bg-blue-50 border border-blue-200" :
+                    step.color === "purple" ? "bg-purple-50 border border-purple-200" :
+                    "bg-green-50 border border-green-200"
+                  }`}>
+                    {step.icon}
+                  </div>
+                  <span className={`text-xs font-bold uppercase tracking-wide mb-1 ${
+                    step.color === "teal" ? "text-teal-600" :
+                    step.color === "blue" ? "text-blue-600" :
+                    step.color === "purple" ? "text-purple-600" :
+                    "text-green-600"
+                  }`}>
+                    {step.role}
+                  </span>
+                  <p className="text-sm font-semibold text-gray-900 mb-1">{step.action}</p>
+                  <p className="text-xs text-gray-500 max-w-[140px]">{step.detail}</p>
+                </div>
+                {i < arr.length - 1 && (
+                  <div className="text-gray-300 text-2xl font-light hidden md:block flex-shrink-0">→</div>
+                )}
+                {i < arr.length - 1 && (
+                  <div className="text-gray-300 text-2xl md:hidden">↓</div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Three feature cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-14">
+            <div className="bg-teal-50 border border-teal-100 rounded-2xl p-6">
+              <div className="text-3xl mb-3">🏥</div>
+              <h3 className="font-bold text-gray-900 mb-2">Internal & External Labs</h3>
+              <p className="text-sm text-gray-600">
+                Add your in-house lab as private or connect to external labs
+                shared across clinics. Labs can also self-register on the platform.
+              </p>
+            </div>
+            <div className="bg-purple-50 border border-purple-100 rounded-2xl p-6">
+              <div className="text-3xl mb-3">🤖</div>
+              <h3 className="font-bold text-gray-900 mb-2">AI Report Summary</h3>
+              <p className="text-sm text-gray-600">
+                Claude AI reads the uploaded report, flags abnormal values,
+                interprets findings and suggests clinical actions — in seconds.
+              </p>
+            </div>
+            <div className="bg-blue-50 border border-blue-100 rounded-2xl p-6">
+              <div className="text-3xl mb-3">🔔</div>
+              <h3 className="font-bold text-gray-900 mb-2">Real-time Notifications</h3>
+              <p className="text-sm text-gray-600">
+                Doctor gets an instant browser notification when a lab uploads
+                results. Red badge on sidebar shows pending reviews.
+              </p>
+            </div>
+          </div>
+
+          {/* Lab portal highlight */}
+          <div className="bg-gray-900 rounded-2xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-2xl">🧪</span>
+                <span className="text-white font-bold text-lg">Dedicated Lab Portal</span>
+              </div>
+              <p className="text-gray-400 text-sm max-w-lg">
+                Labs get their own login. See pending orders with doctor's clinical
+                notes for context. Upload results as PDF or image.
+                No complex training needed — simple, clean interface.
+              </p>
+              <div className="flex flex-wrap gap-3 mt-4">
+                {["Pending order queue", "Doctor's notes visible", "PDF & image upload", "Urgency indicators", "Completed order history"].map(f => (
+                  <span key={f} className="text-xs bg-gray-800 text-gray-300 border border-gray-700 px-3 py-1 rounded-full">
+                    ✓ {f}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="flex-shrink-0">
+              <div className="bg-gray-800 rounded-xl p-4 min-w-[200px]">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 bg-teal-600 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">🧪</span>
+                  </div>
+                  <span className="text-white text-xs font-semibold">Lab Portal</span>
+                </div>
+                {[
+                  { test: "MRI Brain", urgency: "URGENT", status: "Pending" },
+                  { test: "CBC Blood", urgency: "ROUTINE", status: "Pending" },
+                  { test: "X-ray Chest", urgency: "STAT", status: "Done" },
+                ].map((item, i) => (
+                  <div key={i} className="bg-gray-700 rounded-lg p-2.5 mb-2 last:mb-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-white text-xs font-medium">{item.test}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${
+                        item.urgency === "URGENT" ? "bg-orange-500 text-white" :
+                        item.urgency === "STAT" ? "bg-red-500 text-white" :
+                        "bg-gray-600 text-gray-300"
+                      }`}>
+                        {item.urgency}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400 text-xs">Karur Clinic</span>
+                      <span className={`text-xs ${item.status === "Done" ? "text-green-400" : "text-yellow-400"}`}>
+                        {item.status === "Done" ? "✓ Uploaded" : "⏳ Pending"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Review workflow highlight */}
+          <div className="mt-6 bg-gradient-to-r from-teal-600 to-teal-700 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+              <h3 className="text-white font-bold text-lg mb-1">Structured Review Workflow</h3>
+              <p className="text-teal-100 text-sm">
+                Doctor must review the AI summary before prescribing.
+                Every result goes through: Pending → Reviewed → Actioned.
+                Full audit trail maintained.
+              </p>
+            </div>
+            <div className="flex gap-2 flex-shrink-0">
+              {["Pending Review", "Reviewed", "Actioned"].map((s, i) => (
+                <div key={i} className="flex items-center gap-1">
+                  <div className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
+                    i === 0 ? "bg-yellow-400 text-yellow-900" :
+                    i === 1 ? "bg-green-400 text-green-900" :
+                    "bg-white text-teal-700"
+                  }`}>
+                    {s}
+                  </div>
+                  {i < 2 && <span className="text-teal-300 text-sm">→</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* PRICING */}
       <section id="pricing" className="py-20 bg-muted/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
