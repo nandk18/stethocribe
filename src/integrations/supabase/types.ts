@@ -129,6 +129,7 @@ export type Database = {
           language_detected: string | null
           raw_transcript: string | null
           soap_notes: Json | null
+          updated_at: string | null
           visit_id: string
         }
         Insert: {
@@ -139,6 +140,7 @@ export type Database = {
           language_detected?: string | null
           raw_transcript?: string | null
           soap_notes?: Json | null
+          updated_at?: string | null
           visit_id: string
         }
         Update: {
@@ -149,6 +151,7 @@ export type Database = {
           language_detected?: string | null
           raw_transcript?: string | null
           soap_notes?: Json | null
+          updated_at?: string | null
           visit_id?: string
         }
         Relationships: [
@@ -704,6 +707,7 @@ export type Database = {
           medications: Json | null
           notes: string | null
           pdf_url: string | null
+          updated_at: string | null
           visit_id: string
         }
         Insert: {
@@ -715,6 +719,7 @@ export type Database = {
           medications?: Json | null
           notes?: string | null
           pdf_url?: string | null
+          updated_at?: string | null
           visit_id: string
         }
         Update: {
@@ -726,6 +731,7 @@ export type Database = {
           medications?: Json | null
           notes?: string | null
           pdf_url?: string | null
+          updated_at?: string | null
           visit_id?: string
         }
         Relationships: [
