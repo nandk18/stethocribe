@@ -101,10 +101,10 @@ export default function PrescriptionViewer() {
         </button>
       </div>
 
-      {/* Render the prescription HTML */}
+      {/* Render the prescription HTML (with any embedded print buttons stripped) */}
       <div
         className="max-w-3xl mx-auto my-4 bg-white shadow-lg overflow-x-hidden"
-        dangerouslySetInnerHTML={{ __html: htmlContent }}
+        dangerouslySetInnerHTML={{ __html: cleanHtml }}
       />
 
       <style>{`
