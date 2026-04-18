@@ -180,7 +180,7 @@ export default function LabResultsInbox() {
       </div>
 
       <Tabs value={tab} onValueChange={(v: any) => setTab(v)}>
-        <TabsList className="rounded-xl">
+        <TabsList className="rounded-xl flex-wrap h-auto">
           <TabsTrigger value="pending_orders" className="rounded-lg">
             Pending Orders {pendingOrders.length > 0 && <Badge variant="secondary" className="ml-2 h-5 text-xs">{pendingOrders.length}</Badge>}
           </TabsTrigger>
@@ -188,6 +188,7 @@ export default function LabResultsInbox() {
             Pending Review {pendingCount > 0 && <Badge className="ml-2 h-5 text-xs">{pendingCount}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="reviewed" className="rounded-lg">Reviewed</TabsTrigger>
+          <TabsTrigger value="actioned" className="rounded-lg">Actioned</TabsTrigger>
           <TabsTrigger value="all" className="rounded-lg">All Results</TabsTrigger>
         </TabsList>
 
