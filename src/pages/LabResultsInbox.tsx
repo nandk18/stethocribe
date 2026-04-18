@@ -411,14 +411,21 @@ export default function LabResultsInbox() {
                     <MessageCircle className="mr-2 h-4 w-4" /> Send WhatsApp to Patient
                   </Button>
                 )}
-                {expanded.status !== "reviewed" && (
-                  <Button onClick={() => handleMarkReviewed(expanded.id)} className="rounded-lg">
-                    Mark as Reviewed
+                {expanded.status === "pending_review" && (
+                  <Button onClick={() => handleMarkReviewed(expanded.id, expanded.status)} className="rounded-lg">
+                    <CheckCircle className="mr-2 h-4 w-4" /> Mark as Reviewed
                   </Button>
                 )}
-                <Button variant="default" onClick={() => { setExpanded(null); handleActOnResult(expanded); }} className="rounded-lg">
-                  Open Patient Record <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
+                {expanded.status === "reviewed" && (
+                  <Button variant="outline" disabled className="rounded-lg bg-success/10 text-success border-success/20">
+                    <CheckCircle className="mr-2 h-4 w-4" /> Reviewed ✓
+                  </Button>
+                )}
+                {expanded.status === "reviewed" && (
+                  <Button onClick={() => { setExpanded(null); handleActOnResult(expanded); }} className="rounded-lg">
+                    Act on Result <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
           )}
