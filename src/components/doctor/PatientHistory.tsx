@@ -10,6 +10,7 @@ import { Calendar, ChevronDown, FileText, Pill, ExternalLink, FlaskConical, Aler
 import VitalsTrends from "@/components/vitals/VitalsTrends";
 import { renderClinicalNotes } from "@/lib/templateFields";
 import EditVisitSheet from "@/components/doctor/EditVisitSheet";
+import { openPrescription } from "@/lib/prescriptionUtils";
 
 type Props = {
   patientId: string;
@@ -269,7 +270,7 @@ export default function PatientHistory({ patientId, currentVisitId }: Props) {
                     variant="ghost"
                     size="sm"
                     className="text-xs h-7"
-                    onClick={() => window.open(`/rx/${prescriptionId}`, "_blank")}
+                    onClick={() => openPrescription(prescriptionId)}
                   >
                     <ExternalLink className="mr-1 h-3 w-3" /> View Prescription
                   </Button>

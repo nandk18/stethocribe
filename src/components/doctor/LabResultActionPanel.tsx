@@ -62,11 +62,51 @@ export default function LabResultActionPanel({ open, onClose, result, doctorId, 
   const [showShare, setShowShare] = useState(false);
   const [prescriptionId, setPrescriptionId] = useState<string | null>(null);
   const [prescriptionPdfUrl, setPrescriptionPdfUrl] = useState<string | null>(null);
+  const [isFormattingMeds, setIsFormattingMeds] = useState(false);
 
-  // Voice recording (shared hook)
-  const { isRecording, isTranscribing, toggleRecording } = useVoiceRecorder((transcript) =>
-    setDoctorNotes((prev) => (prev ? prev + "\n" + transcript : transcript))
-  );
+  // Voice recording (shared hook) — also auto-extracts medications via AI
+  const { isRecording, isTranscribing, toggleRecording } = useVoiceRecorder(async (transcript) => {
+    // 1. Append transcript to notes
+    setDoctorNotes((prev) => (prev ? prev + "\n" + transcript : transcript));
+
+    // 2. Try to extract medications using format-soap-notes
+    setIsFormattingMeds(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("format-soap-notes", {
+        body: {
+          transcript,
+          template_name: "Prescription Only",
+          template_sections: ["diagnosis", "instructions"],
+          patient_context: {
+            name: result?.patient?.name,
+            test: result?.order?.test_name,
+          },
+        },
+      });
+      if (error) throw error;
+      if (data?.medications && Array.isArray(data.medications) && data.medications.length > 0) {
+        setMedications((prev) => {
+          const existing = prev.filter((m) => m.name.trim());
+          const incoming: Medication[] = data.medications.map((m: any) => ({
+            name: m.name || "",
+            dosage: m.dosage || "",
+            morning: !!m.morning,
+            afternoon: !!m.afternoon,
+            evening: !!m.evening,
+            night: !!m.night,
+            duration: m.duration || "",
+            notes: m.notes || "",
+          }));
+          return [...existing, ...incoming];
+        });
+        toast.success(`Extracted ${data.medications.length} medication${data.medications.length === 1 ? "" : "s"} from voice`);
+      }
+    } catch {
+      // silent — notes still populated
+    } finally {
+      setIsFormattingMeds(false);
+    }
+  });
 
   const isActioned = result?.status === "actioned";
 
@@ -260,6 +300,12 @@ export default function LabResultActionPanel({ open, onClose, result, doctorId, 
                       <Plus className="mr-1 h-3 w-3" /> Add Medicine
                     </Button>
                   </div>
+                  {isFormattingMeds && (
+                    <div className="flex items-center gap-2 text-xs text-primary bg-primary/5 border border-primary/10 rounded-lg px-3 py-2">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Extracting medications from voice...
+                    </div>
+                  )}
                   <div className="space-y-2">
                     {medications.map((med, i) => (
                       <div key={i} className="rounded-lg border p-3 space-y-2">

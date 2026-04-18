@@ -102,10 +102,19 @@ export default function PrescriptionViewer() {
       </div>
 
       {/* Render the prescription HTML (with any embedded print buttons stripped) */}
-      <div
-        className="max-w-3xl mx-auto my-4 bg-white shadow-lg overflow-x-hidden"
-        dangerouslySetInnerHTML={{ __html: cleanHtml }}
-      />
+      <div className="px-2 sm:px-4">
+        <div
+          style={{
+            maxWidth: "794px", // A4 width @ 96dpi
+            margin: "16px auto",
+            background: "white",
+            boxShadow: "0 1px 8px rgba(0,0,0,0.10)",
+            overflowX: "hidden",
+            wordBreak: "break-word",
+          }}
+          dangerouslySetInnerHTML={{ __html: cleanHtml }}
+        />
+      </div>
 
       <style>{`
         @media print {
