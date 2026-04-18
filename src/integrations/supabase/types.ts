@@ -752,6 +752,7 @@ export type Database = {
           full_name: string | null
           id: string
           lab_id: string | null
+          password_set: boolean
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
@@ -761,6 +762,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           lab_id?: string | null
+          password_set?: boolean
           role?: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
@@ -770,6 +772,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           lab_id?: string | null
+          password_set?: boolean
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
