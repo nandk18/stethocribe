@@ -228,7 +228,7 @@ export default function LabResultActionPanel({ open, onClose, result, doctorId, 
                     <Button
                       type="button"
                       size="sm"
-                      onClick={isRecording ? stopRecording : startRecording}
+                      onClick={toggleRecording}
                       disabled={isTranscribing}
                       className={`rounded-full text-xs h-8 ${
                         isRecording ? "bg-destructive hover:bg-destructive/90 animate-pulse" : ""
