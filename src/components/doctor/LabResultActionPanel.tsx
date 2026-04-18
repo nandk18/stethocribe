@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { FlaskConical, Loader2, Send, ExternalLink, Plus, Trash2, Mic, MicOff, CheckCircle2, ArrowRight } from "lucide-react";
 import PrescriptionShareModal from "@/components/doctor/PrescriptionShareModal";
+import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 
 type Medication = {
   name: string; dosage: string;
