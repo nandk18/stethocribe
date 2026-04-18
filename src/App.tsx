@@ -35,20 +35,17 @@ function AppRoutes() {
   const { session, profile, loading } = useAuth();
   const [clinicReady, setClinicReady] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    if (profile?.clinic_id) {
-      supabase
-        .from("clinics")
-        .select("onboarding_complete")
-        .eq("id", profile.clinic_id)
-        .single()
-        .then(({ data }) => {
-          setClinicReady(data?.onboarding_complete ?? false);
-        });
-    } else if (profile && !profile.clinic_id) {
-      setClinicReady(false);
-    }
-  }, [profile]);
+  // Always render these pages regardless of auth state
+  // Must be BEFORE any auth checks
+  const path = window.location.pathname;
+  if (path === "/accept-invite" || path === "/reset-password") {
+    return (
+      <Routes>
+        <Route path="/accept-invite" element={<AcceptInvite />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+      </Routes>
+    );
+  }
 
   if (loading) {
     return (
@@ -73,8 +70,17 @@ function AppRoutes() {
     );
   }
 
-  // Force invited users who haven't set their password to /accept-invite
-  if (profile && profile.password_set === false) {
+  // Wait for profile to load before making any role/password decisions
+  if (!profile) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Force password setup before anything else
+  if (profile.password_set === false) {
     return (
       <Routes>
         <Route path="/accept-invite" element={<AcceptInvite />} />
@@ -84,8 +90,15 @@ function AppRoutes() {
     );
   }
 
-  // Waiting for clinic check
-  if (clinicReady === null) {
+  if (profile?.clinic_id && clinicReady === null) {
+    supabase
+      .from("clinics")
+      .select("onboarding_complete")
+      .eq("id", profile.clinic_id)
+      .single()
+      .then(({ data }) => {
+        setClinicReady(data?.onboarding_complete ?? false);
+      });
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -93,8 +106,7 @@ function AppRoutes() {
     );
   }
 
-  // Needs onboarding
-  if (!clinicReady) {
+  if (!profile.clinic_id || clinicReady === false) {
     return (
       <Routes>
         <Route path="/rx/:prescriptionId" element={<PrescriptionViewer />} />
@@ -104,10 +116,8 @@ function AppRoutes() {
     );
   }
 
-  // Role-based dashboard
   const role = profile?.role;
 
-  // Lab users have a separate portal
   if (role === "lab") {
     return (
       <Routes>
@@ -118,7 +128,10 @@ function AppRoutes() {
     );
   }
 
-  const DashboardComponent = role === "receptionist" ? ReceptionistDashboard : role === "doctor" ? DoctorDashboard : AdminDashboard;
+  const DashboardComponent =
+    role === "receptionist" ? ReceptionistDashboard :
+    role === "doctor" ? DoctorDashboard :
+    AdminDashboard;
 
   return (
     <Routes>
@@ -133,14 +146,14 @@ function AppRoutes() {
       <Route path="/dashboard/patients" element={<PatientsPage />} />
       <Route path="/dashboard/patients/:patientId" element={<PatientDetailPage />} />
       <Route path="/dashboard/templates" element={<TemplatesPage />} />
-      <Route path="/dashboard/analytics" element={role === "admin" ? <AnalyticsPage /> : <Navigate to="/dashboard" replace />} />
+      <Route path="/dashboard/analytics" element={
+        role === "admin" ? <AnalyticsPage /> : <Navigate to="/dashboard" replace />
+      } />
       <Route path="/dashboard/appointments" element={
         role === "admin" || role === "receptionist" ? <AppointmentsPage /> : <Navigate to="/dashboard" replace />
       } />
       <Route path="/dashboard/settings" element={<Settings />} />
-      <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/auth" element={<Navigate to="/dashboard" replace />} />
       <Route path="/onboarding" element={<Navigate to="/dashboard" replace />} />
