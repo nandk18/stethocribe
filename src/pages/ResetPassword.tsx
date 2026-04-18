@@ -85,6 +85,63 @@ export default function ResetPassword() {
     };
   }, []);
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    if (password.length < 8) {
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) {
+      toast.error(error.message);
+    } else {
+      setSuccess(true);
+      toast.success("Password updated!");
+      await supabase.auth.signOut();
+      setTimeout(() => navigate("/auth"), 2000);
+    }
+    setLoading(false);
+  };
+
+  if (checking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (linkError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md text-center shadow-elevated">
+          <CardContent className="py-10 space-y-4">
+            <h2 className="text-xl font-bold text-foreground">Reset Link Issue</h2>
+            <p className="text-muted-foreground text-sm">{linkError}</p>
+            <div className="flex gap-2 justify-center">
+              <Button variant="outline" onClick={() => navigate("/auth")}>Back to Login</Button>
+              <Button onClick={() => navigate("/forgot-password")}>Request New Link</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   if (success) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
