@@ -109,7 +109,7 @@ export default function AcceptInvite() {
       const clinicId = meta.invited_clinic_id || meta.clinic_id || null;
       const labId = meta.invited_lab_id || null;
 
-      const profileUpdate: any = { full_name: fullName, role };
+      const profileUpdate: any = { full_name: fullName, role, password_set: true };
       if (clinicId) profileUpdate.clinic_id = clinicId;
       if (role === "lab" && labId) profileUpdate.lab_id = labId;
       await supabase.from("profiles").update(profileUpdate).eq("user_id", userId);

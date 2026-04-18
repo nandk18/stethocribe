@@ -73,6 +73,17 @@ function AppRoutes() {
     );
   }
 
+  // Force invited users who haven't set their password to /accept-invite
+  if (profile && profile.password_set === false) {
+    return (
+      <Routes>
+        <Route path="/accept-invite" element={<AcceptInvite />} />
+        <Route path="/rx/:prescriptionId" element={<PrescriptionViewer />} />
+        <Route path="*" element={<Navigate to="/accept-invite" replace />} />
+      </Routes>
+    );
+  }
+
   // Waiting for clinic check
   if (clinicReady === null) {
     return (
