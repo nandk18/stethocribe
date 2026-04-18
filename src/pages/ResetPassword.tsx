@@ -14,58 +14,76 @@ export default function ResetPassword() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [linkError, setLinkError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    // Wait for Supabase to process the recovery token from URL
+    let cancelled = false;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
+      if (event === "PASSWORD_RECOVERY" && !cancelled) {
         setReady(true);
+        setChecking(false);
       }
     });
 
-    // Also check if already in a recovery session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setReady(true);
-    });
+    const init = async () => {
+      // Try parsing tokens from both hash and query string
+      const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
+      const query = window.location.search.startsWith("?") ? window.location.search.slice(1) : window.location.search;
+      const params = new URLSearchParams([hash, query].filter(Boolean).join("&"));
 
-    // Timeout fallback
-    setTimeout(() => setReady(true), 3000);
+      const accessToken = params.get("access_token");
+      const refreshToken = params.get("refresh_token") || "";
+      const errorDesc = params.get("error_description");
 
-    return () => subscription.unsubscribe();
+      if (errorDesc) {
+        setLinkError(decodeURIComponent(errorDesc));
+        setChecking(false);
+        return;
+      }
+
+      if (accessToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        if (cancelled) return;
+        if (error) {
+          setLinkError("This reset link has expired or already been used. Reset links are single-use and expire in 1 hour. Please request a new one.");
+          setChecking(false);
+          return;
+        }
+        window.history.replaceState({}, document.title, window.location.pathname);
+        setReady(true);
+        setChecking(false);
+        return;
+      }
+
+      // No token in URL — check for existing recovery session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (session) {
+        setReady(true);
+        setChecking(false);
+      } else {
+        // Wait briefly for the PASSWORD_RECOVERY event before giving up
+        setTimeout(() => {
+          if (!cancelled && !ready) {
+            setLinkError("No reset token found. This usually happens when the link is opened on a different device or browser than where the reset was requested. Please request a new reset link and open it on the same device.");
+            setChecking(false);
+          }
+        }, 2500);
+      }
+    };
+
+    init();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password !== confirmPassword) {
-      toast.error("Passwords do not match");
-      return;
-    }
-    if (password.length < 8) {
-      toast.error("Password must be at least 8 characters");
-      return;
-    }
-
-    setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    if (error) {
-      toast.error(error.message);
-    } else {
-      setSuccess(true);
-      toast.success("Password updated!");
-      await supabase.auth.signOut();
-      setTimeout(() => navigate("/auth"), 2000);
-    }
-    setLoading(false);
-  };
-
-  if (!ready) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   if (success) {
     return (

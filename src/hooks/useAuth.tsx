@@ -9,6 +9,7 @@ type UserProfile = {
   lab_id: string | null;
   full_name: string | null;
   role: "admin" | "doctor" | "receptionist" | "lab";
+  password_set: boolean;
 };
 
 type AuthContextType = {
