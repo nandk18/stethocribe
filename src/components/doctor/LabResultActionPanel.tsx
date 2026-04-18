@@ -63,11 +63,10 @@ export default function LabResultActionPanel({ open, onClose, result, doctorId, 
   const [prescriptionId, setPrescriptionId] = useState<string | null>(null);
   const [prescriptionPdfUrl, setPrescriptionPdfUrl] = useState<string | null>(null);
 
-  // Voice recording
-  const [isRecording, setIsRecording] = useState(false);
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  // Voice recording (shared hook)
+  const { isRecording, isTranscribing, toggleRecording } = useVoiceRecorder((transcript) =>
+    setDoctorNotes((prev) => (prev ? prev + "\n" + transcript : transcript))
+  );
 
   const isActioned = result?.status === "actioned";
 
