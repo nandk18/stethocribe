@@ -14,25 +14,6 @@ DO $$ BEGIN
   CREATE TYPE public.app_role AS ENUM ('admin', 'doctor', 'receptionist', 'lab');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- ---------- HELPER FUNCTIONS ----------
-CREATE OR REPLACE FUNCTION public.update_updated_at()
-RETURNS trigger LANGUAGE plpgsql SET search_path TO 'public' AS $$
-BEGIN
-  NEW.updated_at = now();
-  RETURN NEW;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public.has_role(_user_id uuid, _role app_role)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public' AS $$
-  SELECT EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = _user_id AND role = _role)
-$$;
-
-CREATE OR REPLACE FUNCTION public.get_user_clinic_id(_user_id uuid)
-RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public' AS $$
-  SELECT clinic_id FROM public.profiles WHERE user_id = _user_id LIMIT 1
-$$;
-
 -- ---------- TABLES ----------
 CREATE TABLE IF NOT EXISTS public.clinics (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
