@@ -222,6 +222,25 @@ CREATE TABLE IF NOT EXISTS public.lab_results (
   created_at timestamptz DEFAULT now()
 );
 
+-- ---------- HELPER FUNCTIONS (after tables so references resolve) ----------
+CREATE OR REPLACE FUNCTION public.update_updated_at()
+RETURNS trigger LANGUAGE plpgsql SET search_path TO 'public' AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.has_role(_user_id uuid, _role app_role)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public' AS $$
+  SELECT EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = _user_id AND role = _role)
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_user_clinic_id(_user_id uuid)
+RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public' AS $$
+  SELECT clinic_id FROM public.profiles WHERE user_id = _user_id LIMIT 1
+$$;
+
 -- ---------- BUSINESS FUNCTIONS ----------
 CREATE OR REPLACE FUNCTION public.generate_healthcare_id()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
