@@ -2,7 +2,8 @@
 -- StethoScribe — Consolidated Schema for Self-Hosted Supabase
 -- Run this in: New Supabase Project → SQL Editor
 -- ============================================================
--- Order: extensions → enums → functions → tables → RLS → policies → triggers → storage
+-- Order: extensions → enums → tables → functions → triggers → RLS → policies → storage
+-- Run the entire file in ONE SQL Editor execution. Order matters.
 -- ============================================================
 
 -- ---------- EXTENSIONS ----------
