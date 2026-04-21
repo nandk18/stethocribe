@@ -8,6 +8,7 @@ This package contains everything you need to move your project to a self-hosted 
 2. **`.env` and `src/integrations/supabase/client.ts` are auto-managed** while Cloud is enabled. Disable Cloud BEFORE swapping these files (Connectors → Lovable Cloud → Disable Cloud).
 3. **Edge functions stop auto-deploying.** You must use the Supabase CLI for every future change.
 4. **Lovable AI Gateway (`LOVABLE_API_KEY`) won't work** off Cloud. The two functions using it must be switched to direct OpenAI/Anthropic calls (the other 6 already use direct keys).
+5. **Password hashes cannot be migrated** via the Admin API. All users will need to reset their passwords after migration (see step 11).
 
 ---
 
@@ -19,32 +20,37 @@ This package contains everything you need to move your project to a self-hosted 
 
 ### 2. Apply the schema
 - Open **SQL Editor** in your new project
-- Paste & run `01-schema.sql` from this folder
+- Paste & run `01-schema.sql` from this folder **in a single execution** (ordering matters)
 - Verify all 16 tables exist under **Table Editor**
 
-### 3. Migrate auth users (passwords preserved)
-Supabase has a built-in user migration that preserves bcrypt hashes:
-```bash
-# Install Supabase CLI if needed
-npm i -g supabase
+### 3. Migrate auth users (Admin API, UUID-preserving)
 
-# Export users from source (Lovable Cloud)
-supabase db dump --data-only --schema auth \
-  --db-url "postgresql://postgres:<SOURCE_DB_PASSWORD>@db.hwvtzapsmjptqilrzsfi.supabase.co:5432/postgres" \
-  -f auth-users.sql
+This uses the Supabase Admin API instead of a raw DB dump — no source DB password required.
 
-# Apply to target — but FIRST disable the handle_new_user trigger to avoid duplicate profile rows
-psql "<TARGET_DB_URL>" -c "ALTER TABLE auth.users DISABLE TRIGGER on_auth_user_created;"
-psql "<TARGET_DB_URL>" -f auth-users.sql
-psql "<TARGET_DB_URL>" -c "ALTER TABLE auth.users ENABLE TRIGGER on_auth_user_created;"
-```
-
-Get the source DB password from Lovable Cloud → Settings → Database.
-
-### 4. Export data from Lovable Cloud
 ```bash
 cd migration-package
 bun install @supabase/supabase-js
+
+# Export users from source (Lovable Cloud)
+SOURCE_URL=https://hwvtzapsmjptqilrzsfi.supabase.co \
+SOURCE_SERVICE_KEY=<source_service_role_key> \
+bun run scripts/export-auth-users.ts
+
+# Import into target — preserves original UUIDs so all FKs remain valid
+TARGET_URL=https://YOUR-NEW.supabase.co \
+TARGET_SERVICE_KEY=<target_service_role_key> \
+bun run scripts/import-auth-users.ts
+```
+
+**What's preserved:** UUIDs, email, phone, metadata, email-confirmed flag.
+**What's lost:** password hashes (handled in step 11), Google OAuth identity links (users re-link on next Google sign-in).
+
+> Each `createUser` call fires the `handle_new_user` trigger and auto-creates rows in `public.profiles` and `public.user_roles`. Step 5 truncates those before importing the real data.
+
+Get the source `service_role` key from Lovable Cloud → Backend → Settings → API.
+
+### 4. Export public-schema data from Lovable Cloud
+```bash
 SOURCE_URL=https://hwvtzapsmjptqilrzsfi.supabase.co \
 SOURCE_SERVICE_KEY=<source_service_role_key> \
 bun run scripts/export-data.ts
@@ -53,13 +59,15 @@ Files land in `migration-package/data/`.
 
 ### 5. Import data into your new project
 ```bash
-# Truncate auto-created profiles/user_roles first (handle_new_user created them during auth migration)
+# Clear trigger-created rows from step 3 first
 psql "<TARGET_DB_URL>" -c "TRUNCATE public.profiles, public.user_roles RESTART IDENTITY CASCADE;"
 
 TARGET_URL=https://YOUR-NEW.supabase.co \
 TARGET_SERVICE_KEY=<target_service_role_key> \
 bun run scripts/import-data.ts
 ```
+
+`<TARGET_DB_URL>` is in Supabase Dashboard → Project Settings → Database → Connection string (URI).
 
 ### 6. Migrate storage files
 ```bash
@@ -90,7 +98,7 @@ Deploys all 8 functions: `generate-prescription-pdf`, `transcribe-audio`, `forma
   - Site URL: `https://stethoscribe.lovable.app` (or your domain)
   - Redirect URLs: add `https://stethoscribe.lovable.app/**` and `http://localhost:5173/**`
 - Authentication → Providers → Email: disable "Confirm email" (matches current behavior)
-- (Optional) Enable Google OAuth
+- (Optional) Enable Google OAuth — existing users will re-link their Google identity on first sign-in
 
 ### 10. Disable Lovable Cloud and swap the client
 **Once everything above is verified working in the new project:**
@@ -103,8 +111,23 @@ Deploys all 8 functions: `generate-prescription-pdf`, `transcribe-audio`, `forma
   ```
 - Restart the preview / redeploy
 
-### 11. Smoke test
-- Log in (existing user)
+### 11. Force password reset for all users
+
+Pick one approach:
+
+**A) Bulk email (recommended)** — pre-announce to staff first:
+```bash
+TARGET_URL=https://YOUR-NEW.supabase.co \
+TARGET_SERVICE_KEY=<target_service_role_key> \
+RESET_REDIRECT_URL=https://stethoscribe.lovable.app/reset-password \
+bun run scripts/send-password-resets.ts
+```
+The script throttles at ~2s/email. Configure custom SMTP in Supabase first if you have many users (default email rate limits are tight).
+
+**B) Lazy reset** — do nothing. Users hit "Forgot password?" on the existing login page when they can't sign in. Simpler, but users won't know to do it without a heads-up.
+
+### 12. Smoke test
+- Reset your own password, then log in
 - Open a patient's history
 - Open `/rx/<some-existing-prescription-id>` in incognito
 - Create a new visit → record audio → verify edge functions work
@@ -113,7 +136,10 @@ Deploys all 8 functions: `generate-prescription-pdf`, `transcribe-audio`, `forma
 
 ## Files in this package
 - `01-schema.sql` — full schema, RLS, functions, triggers, storage buckets
-- `scripts/export-data.ts` — dump source data to JSON
+- `scripts/export-auth-users.ts` — dump auth users via Admin API
+- `scripts/import-auth-users.ts` — recreate users in target, preserving UUIDs
+- `scripts/send-password-resets.ts` — optional bulk password-reset emails
+- `scripts/export-data.ts` — dump source public-schema data to JSON
 - `scripts/import-data.ts` — load JSON into target
 - `scripts/migrate-storage.ts` — copy all storage files
 
